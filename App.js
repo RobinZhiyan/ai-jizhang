@@ -6,8 +6,9 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import Icon from './src/components/Icon';
 import { Sheet, Pill } from './src/components/ui';
+import { GoalConfigPage } from './src/components/GoalCard';
 import { T, shadow } from './src/theme';
-import { catMeta, LEDGERS, VOICE_SCRIPT, PROJECT_VOICE_SCRIPT, yuan, pct, budgetState, stateColor } from './src/data';
+import { catMeta, LEDGERS, VOICE_SCRIPT, PROJECT_VOICE_SCRIPT, GOAL_DEFAULT, yuan, pct, budgetState, stateColor } from './src/data';
 import HomeScreen from './src/screens/HomeScreen';
 import ProjectHomeScreen from './src/screens/ProjectHomeScreen';
 import AnalysisScreen from './src/screens/AnalysisScreen';
@@ -106,6 +107,8 @@ export default function App() {
   const [tab, setTab] = useState('home');
   const [ledgerId, setLedgerId] = useState('home');
   const [showLedger, setShowLedger] = useState(false);
+  const [goal, setGoal] = useState(GOAL_DEFAULT);
+  const [showGoal, setShowGoal] = useState(false);
   const [listening, setListening] = useState(false);
   const [reveal, setReveal] = useState(0);
   const [heard, setHeard] = useState([]);
@@ -132,13 +135,13 @@ export default function App() {
   function switchLedger(id) { setLedgerId(id); setTab('home'); setShowLedger(false); }
 
   const transcript = script.full.slice(0, Math.round(reveal * script.full.length));
-  const homeProps = { ledger, onOpenLedger: () => setShowLedger(true), onOpenAgent: () => { onHoldStart(); setTimeout(onHoldEnd, 3000); }, onOpenBudget: () => setTab('budget') };
+  const homeProps = { ledger, onOpenLedger: () => setShowLedger(true), onOpenAgent: () => { onHoldStart(); setTimeout(onHoldEnd, 3000); }, onOpenBudget: () => setTab('budget'), goal, onOpenGoal: () => setShowGoal(true) };
 
   let screen;
   if (tab === 'home') screen = isProject ? <ProjectHomeScreen {...homeProps} /> : <HomeScreen {...homeProps} expenseLog={expenseLog} />;
   else if (tab === 'analysis') screen = <AnalysisScreen />;
   else if (tab === 'budget') screen = <BudgetScreen ledgerId={ledgerId} />;
-  else screen = <ProfileScreen />;
+  else screen = <ProfileScreen onOpenGoal={() => setShowGoal(true)} />;
 
   return (
     <SafeAreaProvider>
@@ -150,6 +153,7 @@ export default function App() {
         </View>
         <TabBar tab={tab} setTab={setTab} listening={listening} onHoldStart={onHoldStart} onHoldEnd={onHoldEnd} />
         <LedgerSheet open={showLedger} onClose={() => setShowLedger(false)} current={ledgerId} onPick={switchLedger} />
+        <GoalConfigPage open={showGoal} onClose={() => setShowGoal(false)} goal={goal} setGoal={setGoal} />
       </SafeAreaView>
     </SafeAreaProvider>
   );

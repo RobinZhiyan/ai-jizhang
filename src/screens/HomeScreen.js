@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
 import Icon from '../components/Icon';
 import { Card, CatIcon, Avatar, Money, Bar, RangeTabs, Sheet } from '../components/ui';
+import { GoalCard } from '../components/GoalCard';
 import { T, shadow } from '../theme';
 import {
   MEMBERS, GRID_CATS, RANGE_SPEND, RANGE_TOTAL, RANGE_LABEL, MONTH_TOTAL, MONTHS, CUR_MONTH,
@@ -10,10 +11,7 @@ import {
   catMeta, catOrders, yuan,
 } from '../data';
 
-// M1 演示小目标（M3 接入小目标配置页）
-const GOAL = { name: '蔚来 ES9', tag: '小目标', glyph: 'car', color: '#0A84FF', target: 800000, saved: 500000, etaText: '约 1 年攒够' };
-
-export default function HomeScreen({ ledger, expenseLog = [], onOpenAgent }) {
+export default function HomeScreen({ ledger, expenseLog = [], onOpenAgent, goal, onOpenGoal }) {
   const [range, setRange] = useState('today');
   const [heroPeriod, setHeroPeriod] = useState('today');
   const [periodOpen, setPeriodOpen] = useState(false);
@@ -48,8 +46,6 @@ export default function HomeScreen({ ledger, expenseLog = [], onOpenAgent }) {
     const list = b > 0 ? [...items, { name: '语音记账', cat: id, amt: b, who: 'dad' }] : items;
     setDetail({ title: `${catMeta(id).zh} · ${RANGE_LABEL[range]}`, items: list });
   }
-
-  const gp = Math.min(GOAL.saved / GOAL.target, 1);
 
   return (
     <View style={{ flex: 1, backgroundColor: T.bg }}>
@@ -115,23 +111,9 @@ export default function HomeScreen({ ledger, expenseLog = [], onOpenAgent }) {
         </View>
 
         {/* 小目标 */}
-        <Card style={{ marginTop: 11 }} pad={14}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
-            <View style={{ width: 26, height: 26, borderRadius: 8, backgroundColor: GOAL.color, alignItems: 'center', justifyContent: 'center' }}>
-              <Icon name={GOAL.glyph} size={15} sw={2} color="#fff" />
-            </View>
-            <Text style={{ fontSize: 10, fontWeight: '700', color: GOAL.color }}>{GOAL.tag}</Text>
-            <Text style={{ fontSize: 14, fontWeight: '700', color: T.ink }}>{GOAL.name}</Text>
-            <View style={{ flex: 1 }} />
-            <Text style={{ fontSize: 15, fontWeight: '700', color: GOAL.color }}>{(gp * 100).toFixed(1)}%</Text>
-            <Icon name="chevron" size={14} color={T.faint} />
-          </View>
-          <View style={{ marginTop: 8 }}><Bar p={gp} color={GOAL.color} /></View>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
-            <Text style={{ fontSize: 11.5, color: T.muted }}>还差 <Text style={{ fontWeight: '700', color: T.ink }}>{yuan(GOAL.target - GOAL.saved)}</Text></Text>
-            <Text style={{ fontSize: 11.5, color: T.muted }}>{GOAL.etaText}</Text>
-          </View>
-        </Card>
+        <View style={{ marginTop: 11 }}>
+          <GoalCard goal={goal} onOpenGoal={onOpenGoal} />
+        </View>
 
         {/* 分类支出 */}
         <View style={hs.secHead}>
