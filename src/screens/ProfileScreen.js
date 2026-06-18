@@ -8,13 +8,13 @@ import { MEMBERS, ROLE_LABEL } from '../data';
 
 const SETTINGS = [
   { icon: 'target', label: '我的小目标', sub: '储蓄目标 · 攒钱进度', goal: true },
-  { icon: 'wallet', label: '固定收支', sub: '工资 · 房贷 · 车贷' },
+  { icon: 'wallet', label: '固定收支', sub: '工资 · 房贷 · 车贷', fixed: true },
   { icon: 'calendar', label: '月度 AI 报表', sub: '省钱建议 · 目标提速' },
   { icon: 'sliders', label: '分类管理', sub: '自定义类目' },
   { icon: 'users', label: '成员与权限', sub: '家人 · 保姆阿姨' },
 ];
 
-export default function ProfileScreen({ onOpenGoal }) {
+export default function ProfileScreen({ onOpenGoal, onOpenFixed }) {
   return (
     <View style={{ flex: 1, backgroundColor: T.bg }}>
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 30 }} showsVerticalScrollIndicator={false}>
@@ -35,7 +35,7 @@ export default function ProfileScreen({ onOpenGoal }) {
 
         <Card style={{ marginTop: 16 }} pad={0}>
           {SETTINGS.map((it, i) => (
-            <Pressable key={it.label} onPress={it.goal ? onOpenGoal : undefined} style={[ps.setting, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: T.hair }]}>
+            <Pressable key={it.label} onPress={it.goal ? onOpenGoal : it.fixed ? onOpenFixed : undefined} style={[ps.setting, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: T.hair }]}>
               <View style={ps.settingIcon}><Icon name={it.icon} size={20} sw={1.9} color={T.ink} /></View>
               <View style={{ flex: 1, marginLeft: 12 }}>
                 <Text style={ps.settingLabel}>{it.label}</Text>

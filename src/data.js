@@ -311,3 +311,22 @@ export function wan(n) {
   return '¥' + str + '万';
 }
 export const yuanFull = (n) => '¥' + Math.round(Number(n) || 0).toLocaleString('zh-CN');
+
+// ── 固定收支（月薪自动入账 + 房贷/车贷还款）移植 fixed.jsx ────
+export const FIXED_DEFAULTS = {
+  salaries: [
+    { id: 's-dad', who: 'dad', amount: 20000 },
+    { id: 's-mom', who: 'mom', amount: 20000 },
+  ],
+  loans: [
+    { id: 'l-house', name: '房贷', glyph: 'bank', color: '#1C7ED6', amount: 8600, day: 15, mode: 'full' },
+    { id: 'l-car', name: '车贷', glyph: 'car', color: '#0A84FF', amount: 3200, day: 8, mode: 'spread' },
+  ],
+};
+const DPM = 30;
+const sumF = (arr, f) => arr.reduce((s, x) => s + (Number(f(x)) || 0), 0);
+export function fixedMonthlySalary(c) { return sumF(c.salaries, (x) => x.amount); }
+export function fixedDailyIncome(c) { return Math.round(fixedMonthlySalary(c) / DPM); }
+export function fixedMonthlyLoan(c) { return sumF(c.loans, (l) => l.amount); }
+export function fixedDailyAmort(c) { return Math.round(sumF(c.loans.filter((l) => l.mode === 'spread'), (l) => l.amount) / DPM); }
+export function fixedDailyNet(c) { return fixedDailyIncome(c) - fixedDailyAmort(c); }

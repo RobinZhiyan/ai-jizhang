@@ -7,8 +7,9 @@ import { StatusBar } from 'expo-status-bar';
 import Icon from './src/components/Icon';
 import { Sheet, Pill } from './src/components/ui';
 import { GoalConfigPage } from './src/components/GoalCard';
+import { FixedConfigSheet } from './src/components/FixedConfig';
 import { T, shadow } from './src/theme';
-import { catMeta, LEDGERS, VOICE_SCRIPT, PROJECT_VOICE_SCRIPT, GOAL_DEFAULT, yuan, pct, budgetState, stateColor } from './src/data';
+import { catMeta, LEDGERS, VOICE_SCRIPT, PROJECT_VOICE_SCRIPT, GOAL_DEFAULT, FIXED_DEFAULTS, fixedDailyIncome, yuan, pct, budgetState, stateColor } from './src/data';
 import HomeScreen from './src/screens/HomeScreen';
 import ProjectHomeScreen from './src/screens/ProjectHomeScreen';
 import AnalysisScreen from './src/screens/AnalysisScreen';
@@ -109,6 +110,8 @@ export default function App() {
   const [showLedger, setShowLedger] = useState(false);
   const [goal, setGoal] = useState(GOAL_DEFAULT);
   const [showGoal, setShowGoal] = useState(false);
+  const [fixed, setFixed] = useState(FIXED_DEFAULTS);
+  const [showFixed, setShowFixed] = useState(false);
   const [listening, setListening] = useState(false);
   const [reveal, setReveal] = useState(0);
   const [heard, setHeard] = useState([]);
@@ -135,13 +138,13 @@ export default function App() {
   function switchLedger(id) { setLedgerId(id); setTab('home'); setShowLedger(false); }
 
   const transcript = script.full.slice(0, Math.round(reveal * script.full.length));
-  const homeProps = { ledger, onOpenLedger: () => setShowLedger(true), onOpenAgent: () => { onHoldStart(); setTimeout(onHoldEnd, 3000); }, onOpenBudget: () => setTab('budget'), goal, onOpenGoal: () => setShowGoal(true) };
+  const homeProps = { ledger, onOpenLedger: () => setShowLedger(true), onOpenAgent: () => { onHoldStart(); setTimeout(onHoldEnd, 3000); }, onOpenBudget: () => setTab('budget'), goal, onOpenGoal: () => setShowGoal(true), fixedDailyIncome: fixedDailyIncome(fixed) };
 
   let screen;
   if (tab === 'home') screen = isProject ? <ProjectHomeScreen {...homeProps} /> : <HomeScreen {...homeProps} expenseLog={expenseLog} />;
   else if (tab === 'analysis') screen = <AnalysisScreen />;
   else if (tab === 'budget') screen = <BudgetScreen ledgerId={ledgerId} />;
-  else screen = <ProfileScreen onOpenGoal={() => setShowGoal(true)} />;
+  else screen = <ProfileScreen onOpenGoal={() => setShowGoal(true)} onOpenFixed={() => setShowFixed(true)} />;
 
   return (
     <SafeAreaProvider>
@@ -154,6 +157,7 @@ export default function App() {
         <TabBar tab={tab} setTab={setTab} listening={listening} onHoldStart={onHoldStart} onHoldEnd={onHoldEnd} />
         <LedgerSheet open={showLedger} onClose={() => setShowLedger(false)} current={ledgerId} onPick={switchLedger} />
         <GoalConfigPage open={showGoal} onClose={() => setShowGoal(false)} goal={goal} setGoal={setGoal} />
+        <FixedConfigSheet open={showFixed} onClose={() => setShowFixed(false)} config={fixed} setConfig={setFixed} />
       </SafeAreaView>
     </SafeAreaProvider>
   );

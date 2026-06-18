@@ -11,7 +11,7 @@ import {
   catMeta, catOrders, yuan,
 } from '../data';
 
-export default function HomeScreen({ ledger, expenseLog = [], onOpenAgent, goal, onOpenGoal }) {
+export default function HomeScreen({ ledger, expenseLog = [], onOpenAgent, goal, onOpenGoal, fixedDailyIncome = 0 }) {
   const [range, setRange] = useState('today');
   const [heroPeriod, setHeroPeriod] = useState('today');
   const [periodOpen, setPeriodOpen] = useState(false);
@@ -32,7 +32,7 @@ export default function HomeScreen({ ledger, expenseLog = [], onOpenAgent, goal,
     { k: 'last', short: '上月', label: '上月支出', val: MONTHS[CUR_MONTH - 1].expense, items: LASTMONTH_EXP_CATS, variant: 'cat' },
   ];
   const curP = HERO.find((p) => p.k === heroPeriod) || HERO[0];
-  const todayIncome = TODAY_INCOME;
+  const todayIncome = TODAY_INCOME + fixedDailyIncome;
   const monthBalance = MONTHS[CUR_MONTH].income - (MONTH_TOTAL + sumBumps);
 
   // 方格按金额降序
