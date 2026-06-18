@@ -284,3 +284,30 @@ export function donutData(n = 7) {
   if (restSum > 0) data.push({ id: '__other', value: restSum, color: '#C7C7CC', other: true });
   return data;
 }
+
+// ── 小目标（储蓄目标 + 攒钱时长折算）移植 goal.jsx ────────────
+export const GOAL_DEFAULT = {
+  enabled: true, name: '蔚来 ES9', glyph: 'car', color: '#0A84FF',
+  target: 800000, saved: 500000, monthly: 26080, // ≈ 本月结余
+};
+export function goalRemaining(g) { return Math.max((Number(g.target) || 0) - (Number(g.saved) || 0), 0); }
+export function goalProgress(g) { const t = Number(g.target) || 0; return t > 0 ? Math.min((Number(g.saved) || 0) / t, 1) : 0; }
+export function goalMonths(g) {
+  const r = goalRemaining(g), m = Number(g.monthly) || 0;
+  if (r <= 0) return 0;
+  if (m <= 0) return Infinity;
+  return Math.ceil(r / m);
+}
+export function fmtMonths(n) {
+  if (n === 0) return '已达成';
+  if (!isFinite(n)) return '—';
+  if (n < 12) return `约 ${n} 个月`;
+  const y = Math.floor(n / 12), mo = n % 12;
+  return mo ? `约 ${y} 年 ${mo} 个月` : `约 ${y} 年`;
+}
+export function wan(n) {
+  const v = (Number(n) || 0) / 10000;
+  const str = Number.isInteger(v) ? v : v.toFixed(1);
+  return '¥' + str + '万';
+}
+export const yuanFull = (n) => '¥' + Math.round(Number(n) || 0).toLocaleString('zh-CN');

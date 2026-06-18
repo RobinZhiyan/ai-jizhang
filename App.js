@@ -1,13 +1,15 @@
-// App.js — 根：5-Tab 导航（总览/分析/记账长按语音/预算/我的）+ 语音状态机
+// App.js — 根：5-Tab 导航（总览/分析/记账长按语音/预算/我的）+ 多账本 + 语音状态机
 // 1:1 移植自原型 app.jsx（去掉 iOS 设备外壳，RN 直接全屏）
 import React, { useState, useRef } from 'react';
-import { View, Text, Pressable, StyleSheet, Animated, Easing } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import Icon from './src/components/Icon';
+import { Sheet, Pill } from './src/components/ui';
 import { T, shadow } from './src/theme';
-import { catMeta, LEDGERS, VOICE_SCRIPT, PROJECT_VOICE_SCRIPT } from './src/data';
+import { catMeta, LEDGERS, VOICE_SCRIPT, PROJECT_VOICE_SCRIPT, yuan, pct, budgetState, stateColor } from './src/data';
 import HomeScreen from './src/screens/HomeScreen';
+import ProjectHomeScreen from './src/screens/ProjectHomeScreen';
 import AnalysisScreen from './src/screens/AnalysisScreen';
 import BudgetScreen from './src/screens/BudgetScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
@@ -46,7 +48,32 @@ function TabBar({ tab, setTab, listening, onHoldStart, onHoldEnd }) {
   );
 }
 
-// 长按聆听浮层（M1 简化：实时字幕 + 已识别条；飞入动画归 M2）
+function LedgerSheet({ open, onClose, current, onPick }) {
+  return (
+    <Sheet open={open} onClose={onClose} title="切换账本 / 项目">
+      <View style={{ gap: 10 }}>
+        {Object.values(LEDGERS).map((lg) => {
+          const on = lg.id === current; const p = pct(lg.spent, lg.budget);
+          return (
+            <Pressable key={lg.id} onPress={() => onPick(lg.id)} style={{ borderWidth: 1.5, borderColor: on ? T.ink : 'transparent', backgroundColor: T.surface, borderRadius: T.radius, padding: 15, flexDirection: 'row', alignItems: 'center', gap: 12, ...shadow }}>
+              <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: lg.tint, alignItems: 'center', justifyContent: 'center' }}><Icon name={lg.icon} size={21} sw={2} color="#fff" /></View>
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+                  <Text style={{ fontSize: 16, fontWeight: '600', color: T.ink }}>{lg.name}</Text>
+                  <Pill color={lg.kind === 'project' ? T.warn : T.blue} bg={lg.kind === 'project' ? 'rgba(255,149,0,0.14)' : 'rgba(10,132,255,0.12)'}>{lg.kind === 'project' ? '项目' : '日常'}</Pill>
+                </View>
+                <Text style={{ fontSize: 12.5, color: T.muted, marginTop: 3 }}>{yuan(lg.spent)} / {yuan(lg.budget)} · 已用 {Math.round(p * 100)}%</Text>
+              </View>
+              {on && <Icon name="check" size={22} sw={2.4} color={T.ok} />}
+            </Pressable>
+          );
+        })}
+      </View>
+    </Sheet>
+  );
+}
+
+// 长按聆听浮层（M1：实时字幕 + 已识别条；飞入动画 M2）
 function HoldOverlay({ open, transcript, heard }) {
   if (!open) return null;
   return (
@@ -55,7 +82,7 @@ function HoldOverlay({ open, transcript, heard }) {
         <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: T.ok }} />
         <Text style={{ fontSize: 13, fontWeight: '600', color: T.muted }}>正在聆听…</Text>
       </View>
-      <Text style={s.transcript}>{transcript || ' '}</Text>
+      <Text style={s.transcript}>{transcript || ' '}</Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginTop: 22, maxWidth: 340 }}>
         {heard.map((c, i) => {
           const m = catMeta(c.cat);
@@ -78,10 +105,11 @@ function HoldOverlay({ open, transcript, heard }) {
 export default function App() {
   const [tab, setTab] = useState('home');
   const [ledgerId, setLedgerId] = useState('home');
+  const [showLedger, setShowLedger] = useState(false);
   const [listening, setListening] = useState(false);
   const [reveal, setReveal] = useState(0);
   const [heard, setHeard] = useState([]);
-  const [expenseLog, setExpenseLog] = useState([]); // 语音记入的支出（叠加到方格）
+  const [expenseLog, setExpenseLog] = useState([]);
   const timers = useRef([]);
   const ledger = LEDGERS[ledgerId];
   const isProject = ledger.kind === 'project';
@@ -98,14 +126,16 @@ export default function App() {
   function onHoldEnd() {
     clearTimers(); setListening(false);
     const items = script.chunks.map((c) => ({ name: c.name, cat: c.cat, amt: c.amt, who: 'dad' }));
-    setExpenseLog((l) => [...items, ...l]);
+    if (!isProject) setExpenseLog((l) => [...items, ...l]);
     setReveal(0); setHeard([]);
   }
+  function switchLedger(id) { setLedgerId(id); setTab('home'); setShowLedger(false); }
 
   const transcript = script.full.slice(0, Math.round(reveal * script.full.length));
+  const homeProps = { ledger, onOpenLedger: () => setShowLedger(true), onOpenAgent: () => { onHoldStart(); setTimeout(onHoldEnd, 3000); }, onOpenBudget: () => setTab('budget') };
 
   let screen;
-  if (tab === 'home') screen = <HomeScreen ledger={ledger} expenseLog={expenseLog} onOpenAgent={() => { onHoldStart(); setTimeout(onHoldEnd, 3000); }} />;
+  if (tab === 'home') screen = isProject ? <ProjectHomeScreen {...homeProps} /> : <HomeScreen {...homeProps} expenseLog={expenseLog} />;
   else if (tab === 'analysis') screen = <AnalysisScreen />;
   else if (tab === 'budget') screen = <BudgetScreen ledgerId={ledgerId} />;
   else screen = <ProfileScreen />;
@@ -119,6 +149,7 @@ export default function App() {
           <HoldOverlay open={listening} transcript={transcript} heard={heard} />
         </View>
         <TabBar tab={tab} setTab={setTab} listening={listening} onHoldStart={onHoldStart} onHoldEnd={onHoldEnd} />
+        <LedgerSheet open={showLedger} onClose={() => setShowLedger(false)} current={ledgerId} onPick={switchLedger} />
       </SafeAreaView>
     </SafeAreaProvider>
   );
