@@ -1,9 +1,10 @@
 // HomeScreen.js — 首页（1:1 移植 home.jsx 的 M1 核心：账本头 / 收支大卡(区间) / 小目标 / 分类方格 / 明细）
 import React, { useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, TextInput } from 'react-native';
 import Icon from '../components/Icon';
 import { Card, CatIcon, Avatar, Money, Bar, RangeTabs, Sheet, useCountUp } from '../components/ui';
 import { GoalCard } from '../components/GoalCard';
+import { usePersistedState } from '../usePersisted';
 import { T, shadow } from '../theme';
 import {
   MEMBERS, GRID_CATS, RANGE_SPEND, RANGE_TOTAL, RANGE_LABEL, MONTH_TOTAL, MONTHS, CUR_MONTH,
@@ -17,6 +18,11 @@ export default function HomeScreen({ ledger, expenseLog = [], onOpenAgent, goal,
   const [periodOpen, setPeriodOpen] = useState(false);
   const [showFeed, setShowFeed] = useState(false);
   const [detail, setDetail] = useState(null);
+  const [customCats, setCustomCats] = usePersistedState('vb_customcats', []);
+  const [showAdd, setShowAdd] = useState(false);
+  const [draft, setDraft] = useState({ name: '', color: '#0A84FF', glyph: 'spark' });
+  const addCustom = () => { const name = draft.name.trim(); if (!name) return; setCustomCats((a) => [...a, { id: 'custom-' + Date.now(), zh: name, color: draft.color, glyph: draft.glyph, amt: 0 }]); setDraft({ name: '', color: '#0A84FF', glyph: 'spark' }); setShowAdd(false); };
+  const removeCustom = (id) => setCustomCats((a) => a.filter((c) => c.id !== id));
 
   // 语音记入的支出按分类累加
   const bumps = {};
@@ -133,6 +139,12 @@ export default function HomeScreen({ ledger, expenseLog = [], onOpenAgent, goal,
         <View style={hs.grid}>
           {order.map((id) => <Tile key={id} id={id} amount={tileAmt(id)} badge={bumps[id]} onPress={() => openCat(id)} />)}
           <Tile id="__other" amount={otherAmt} onPress={() => openCat('__other')} />
+          {customCats.map((c) => <Tile key={c.id} id={c.id} amount={c.amt || 0} meta={c} onPress={() => setDetail({ title: c.zh, items: [] })} />)}
+          <Pressable onPress={() => setShowAdd(true)} style={[hs.tile, hs.addTile]}>
+            <View style={[hs.tileIcon, { backgroundColor: T.surface }]}><Icon name="plus" size={18} sw={2.6} color={T.blue} /></View>
+            <Text style={hs.tileName}>自定义</Text>
+            <Text style={{ fontSize: 11, color: T.faint, marginTop: 4 }}>新增分类</Text>
+          </Pressable>
         </View>
 
         {/* 明细入口 */}
@@ -193,12 +205,58 @@ export default function HomeScreen({ ledger, expenseLog = [], onOpenAgent, goal,
           })}
         </View>
       </Sheet>
+
+      {/* 新建自定义分类 */}
+      <Sheet open={showAdd} onClose={() => setShowAdd(false)} title="新建分类">
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: T.surface, borderRadius: T.radius, padding: 16, ...shadow, marginBottom: 14 }}>
+          <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: draft.color, alignItems: 'center', justifyContent: 'center' }}><Icon name={draft.glyph} size={26} sw={2} color="#fff" /></View>
+          <View style={{ minWidth: 0 }}>
+            <Text style={{ fontSize: 16, fontWeight: '600', color: draft.name.trim() ? T.ink : T.faint }}>{draft.name.trim() || '分类名称'}</Text>
+            <Text style={{ fontSize: 12.5, color: T.muted, marginTop: 2 }}>预览 · 显示在分类支出里</Text>
+          </View>
+        </View>
+        <View style={{ backgroundColor: T.surface, borderRadius: T.radius, padding: 16, ...shadow }}>
+          <TextInput value={draft.name} onChangeText={(t) => setDraft((s) => ({ ...s, name: t }))} placeholder="分类名称，如「健身」「宠物」「咖啡」" placeholderTextColor={T.faint}
+            style={{ backgroundColor: T.surface2, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, color: T.ink }} />
+          <Text style={hs.formLabel}>选择图标</Text>
+          <View style={{ flexDirection: 'row', gap: 9, flexWrap: 'wrap' }}>
+            {CUSTOM_GLYPHS.map((g) => (
+              <Pressable key={g} onPress={() => setDraft((s) => ({ ...s, glyph: g }))} style={{ width: 42, height: 42, borderRadius: 12, backgroundColor: draft.glyph === g ? draft.color : T.surface2, alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name={g} size={20} sw={2} color={draft.glyph === g ? '#fff' : T.muted} />
+              </Pressable>
+            ))}
+          </View>
+          <Text style={hs.formLabel}>选择颜色</Text>
+          <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }}>
+            {CUSTOM_SWATCHES.map((col) => (
+              <Pressable key={col} onPress={() => setDraft((s) => ({ ...s, color: col }))} style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: col, borderWidth: draft.color === col ? 2 : 0, borderColor: T.surface }} />
+            ))}
+          </View>
+          <Pressable onPress={addCustom} disabled={!draft.name.trim()} style={{ marginTop: 20, height: 50, borderRadius: 14, backgroundColor: draft.name.trim() ? T.accent : T.surface2, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 }}>
+            <Icon name="plus" size={18} sw={2.4} color={draft.name.trim() ? T.accentInk : T.faint} /><Text style={{ fontSize: 15.5, fontWeight: '600', color: draft.name.trim() ? T.accentInk : T.faint }}>添加分类</Text>
+          </Pressable>
+        </View>
+        {customCats.length > 0 && (
+          <View style={{ backgroundColor: T.surface, borderRadius: T.radius, paddingHorizontal: 16, ...shadow, marginTop: 14 }}>
+            {customCats.map((c, i) => (
+              <View key={c.id} style={[{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 }, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: T.hair }]}>
+                <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: c.color, alignItems: 'center', justifyContent: 'center' }}><Icon name={c.glyph} size={19} sw={2} color="#fff" /></View>
+                <Text style={{ flex: 1, fontSize: 15, fontWeight: '500', color: T.ink }}>{c.zh}</Text>
+                <Pressable onPress={() => removeCustom(c.id)} style={{ backgroundColor: T.surface2, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 }}><Text style={{ fontSize: 13, color: T.muted }}>删除</Text></Pressable>
+              </View>
+            ))}
+          </View>
+        )}
+      </Sheet>
     </View>
   );
 }
 
-function Tile({ id, amount, badge, onPress }) {
-  const c = catMeta(id);
+const CUSTOM_GLYPHS = ['spark', 'dumbbell', 'paw', 'book', 'play', 'cross', 'bag', 'leaf', 'bottle', 'plug', 'chat', 'car'];
+const CUSTOM_SWATCHES = ['#0A84FF', '#34C759', '#FF9500', '#FF2D55', '#5E5CE6', '#FF3B30', '#64D2FF', '#8E8E93'];
+
+function Tile({ id, amount, badge, onPress, meta }) {
+  const c = meta || catMeta(id);
   const zero = amount === 0;
   return (
     <Pressable onPress={onPress} style={hs.tile}>
@@ -234,6 +292,8 @@ const hs = StyleSheet.create({
   tileName: { fontSize: 12.5, color: T.muted, fontWeight: '500' },
   tileAmt: { fontSize: 16, fontWeight: T.numWeight, letterSpacing: -0.5, marginTop: 4 },
   badge: { position: 'absolute', top: 6, right: 6, backgroundColor: T.flash, borderRadius: 7, paddingHorizontal: 6, paddingVertical: 2 },
+  addTile: { borderWidth: 1.5, borderStyle: 'dashed', borderColor: 'rgba(120,120,128,0.4)', backgroundColor: 'transparent', shadowOpacity: 0, elevation: 0 },
+  formLabel: { fontSize: 12.5, fontWeight: '600', color: T.muted, marginTop: 17, marginBottom: 10 },
 
   feedBtn: { marginTop: 14, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: T.surface, borderRadius: T.radiusSm, paddingVertical: 13, paddingHorizontal: 16, ...shadow },
   agent: { marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: T.blue, borderRadius: T.radius, paddingVertical: 15, paddingHorizontal: 16, ...shadow },
