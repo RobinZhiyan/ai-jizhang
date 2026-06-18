@@ -32,15 +32,20 @@
 - 原型外层是「iOS 设备外壳」预览；RN 直接全屏，去掉 IOSDevice 外壳与 TweaksPanel。
 
 ## 进度
-- [x] theme.js — 主题 tokens + inkSet / rgbOf
-- [x] data.js — 全量数据层（19类/收入/装修12阶段/多账本/月份/流水/语音脚本/helpers）
-- [x] Icon.js — 全部单线 glyph
-- [ ] ui.js — Card/Money/Avatar/CatIcon/Pill/Segmented/RangeTabs/Bar/SectionTitle/Sheet/BudgetMeter/Donut/LineChart/useCountUp/CatTile
-- [ ] App.js — 5tab + 中间长按语音 + 账本/角色 sheet + 屏切换
-- [ ] HomeScreen — hero(区间下拉) / 方格(排序) / 小目标 / 明细 modal / 自定义分类
-- [ ] AnalysisScreen / BudgetScreen / ProfileScreen / ProjectHomeScreen
-- [ ] M2 动画：飞入轨迹 / FLIP 重排 / 金币入袋 / 闪卡 / 音效 / 持久化
-- [ ] M3 次要：角色权限 / 固定收支 / 小目标配置 / 分类可视化
+- [x] theme.js / data.js / Icon.js / ui.js — 基础层 + 组件库
+- [x] App.js — 5tab + 长按语音 + 多账本/角色 + 各 Sheet
+- [x] HomeScreen — hero(区间下拉) / 方格(排序) / 小目标 / 明细 / 权限控制
+- [x] AnalysisScreen / BudgetScreen / ProfileScreen
+- [x] ProjectHomeScreen — 装修项目首页(预算/阶段/采购/预算表单)
+- [x] 小目标 — GoalCard + GoalConfigPage(攒钱折算)
+- [x] 固定收支 — FixedConfig(月薪入账 + 房贷/车贷两种扣款)
+- [x] 角色权限 — Roles(视角切换/保姆横幅/权限配置/Tab隐藏/首页隐藏核心数据)
+- [ ] M2 动画：语音飞入轨迹 / FLIP 重排 / 金币入袋 / 闪卡 / 音效 / 数值滚动
+- [ ] M2 持久化 — AsyncStorage (goal/fixed/perms/customcats)
+- [ ] M3 自定义分类(home AddTile) / 分类可视化(treemap/rose/sankey)
+
+## 已提交里程碑
+502ce49 scaffold · 2776fa0 M1骨架 · d1aad4f 装修+账本 · ba0e87f 小目标 · a42f069 固定收支 · (角色权限验证中)
 
 ## 里程碑
 - **M1（当前冲刺）**：视觉 + 导航 1:1 可跑，核心 4-5 屏，语音用简化交互。

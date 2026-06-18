@@ -11,7 +11,7 @@ import {
   catMeta, catOrders, yuan,
 } from '../data';
 
-export default function HomeScreen({ ledger, expenseLog = [], onOpenAgent, goal, onOpenGoal, fixedDailyIncome = 0 }) {
+export default function HomeScreen({ ledger, expenseLog = [], onOpenAgent, goal, onOpenGoal, fixedDailyIncome = 0, perms = {}, viewRole, onOpenRoleSwitch, onExitHelper }) {
   const [range, setRange] = useState('today');
   const [heroPeriod, setHeroPeriod] = useState('today');
   const [periodOpen, setPeriodOpen] = useState(false);
@@ -56,7 +56,7 @@ export default function HomeScreen({ ledger, expenseLog = [], onOpenAgent, goal,
             <Text style={hs.title}>{ledger.name}</Text>
             <Icon name="chevron" size={16} sw={2.4} color={T.faint} style={{ transform: [{ rotate: '90deg' }] }} />
           </Pressable>
-          <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Pressable onPress={viewRole === 'helper' ? onExitHelper : onOpenRoleSwitch} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
             <View style={{ flexDirection: 'row' }}>
               {Object.values(MEMBERS).map((m, i) => (
                 <View key={m.id} style={{ marginLeft: i ? -10 : 0 }}><Avatar m={m} size={30} ring /></View>
@@ -81,16 +81,22 @@ export default function HomeScreen({ ledger, expenseLog = [], onOpenAgent, goal,
               </View>
               <Text style={hs.heroNum}><Text style={{ fontSize: 19, opacity: 0.8 }}>¥</Text>{curP.val.toLocaleString('zh-CN')}</Text>
             </View>
-            <View style={{ width: StyleSheet.hairlineWidth, backgroundColor: 'rgba(255,255,255,0.18)', marginHorizontal: 2 }} />
-            <View style={{ flex: 1, paddingLeft: 16 }}>
-              <Text style={hs.heroLabel}>今日收入</Text>
-              <Text style={[hs.heroNum, { color: T.ok }]}><Text style={{ fontSize: 19, opacity: 0.85 }}>¥</Text>{todayIncome.toLocaleString('zh-CN')}</Text>
+            {perms.seeIncome !== false && (
+              <>
+                <View style={{ width: StyleSheet.hairlineWidth, backgroundColor: 'rgba(255,255,255,0.18)', marginHorizontal: 2 }} />
+                <View style={{ flex: 1, paddingLeft: 16 }}>
+                  <Text style={hs.heroLabel}>今日收入</Text>
+                  <Text style={[hs.heroNum, { color: T.ok }]}><Text style={{ fontSize: 19, opacity: 0.85 }}>¥</Text>{todayIncome.toLocaleString('zh-CN')}</Text>
+                </View>
+              </>
+            )}
+          </View>
+          {perms.seeBalance !== false && (
+            <View style={hs.heroDivider}>
+              <Text style={[hs.heroLabel, { opacity: 0.66 }]}>本月结余</Text>
+              <Text style={hs.heroBal}>{yuan(monthBalance)}</Text>
             </View>
-          </View>
-          <View style={hs.heroDivider}>
-            <Text style={[hs.heroLabel, { opacity: 0.66 }]}>本月结余</Text>
-            <Text style={hs.heroBal}>{yuan(monthBalance)}</Text>
-          </View>
+          )}
 
           {periodOpen && (
             <View style={hs.dropdown}>
@@ -111,9 +117,11 @@ export default function HomeScreen({ ledger, expenseLog = [], onOpenAgent, goal,
         </View>
 
         {/* 小目标 */}
-        <View style={{ marginTop: 11 }}>
-          <GoalCard goal={goal} onOpenGoal={onOpenGoal} />
-        </View>
+        {perms.seeGoal !== false && (
+          <View style={{ marginTop: 11 }}>
+            <GoalCard goal={goal} onOpenGoal={onOpenGoal} />
+          </View>
+        )}
 
         {/* 分类支出 */}
         <View style={hs.secHead}>

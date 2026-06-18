@@ -8,6 +8,7 @@ import Icon from './src/components/Icon';
 import { Sheet, Pill } from './src/components/ui';
 import { GoalConfigPage } from './src/components/GoalCard';
 import { FixedConfigSheet } from './src/components/FixedConfig';
+import { RoleSwitchSheet, PermConfigSheet, HelperBanner, permsFor, PERM_DEFAULT } from './src/components/Roles';
 import { T, shadow } from './src/theme';
 import { catMeta, LEDGERS, VOICE_SCRIPT, PROJECT_VOICE_SCRIPT, GOAL_DEFAULT, FIXED_DEFAULTS, fixedDailyIncome, yuan, pct, budgetState, stateColor } from './src/data';
 import HomeScreen from './src/screens/HomeScreen';
@@ -24,10 +25,12 @@ const TABS = [
   { id: 'profile', label: '我的', icon: 'users' },
 ];
 
-function TabBar({ tab, setTab, listening, onHoldStart, onHoldEnd }) {
+function TabBar({ tab, setTab, listening, onHoldStart, onHoldEnd, perms = {} }) {
   return (
     <View style={s.tabbar}>
       {TABS.map((t) => {
+        const allowed = t.center || t.id === 'home' || (t.id === 'analysis' ? perms.seeAnalysis !== false : t.id === 'budget' ? perms.seeBudget !== false : t.id === 'profile' ? perms.admin !== false : true);
+        if (!allowed) return <View key={t.id} style={{ flex: 1 }} />;
         if (t.center) {
           return (
             <Pressable key={t.id} onPressIn={onHoldStart} onPressOut={onHoldEnd} style={s.centerWrap}>
@@ -112,6 +115,10 @@ export default function App() {
   const [showGoal, setShowGoal] = useState(false);
   const [fixed, setFixed] = useState(FIXED_DEFAULTS);
   const [showFixed, setShowFixed] = useState(false);
+  const [viewRole, setViewRole] = useState('admin');
+  const [helperPerms, setHelperPerms] = useState(PERM_DEFAULT);
+  const [showRoleSwitch, setShowRoleSwitch] = useState(false);
+  const [showPerms, setShowPerms] = useState(false);
   const [listening, setListening] = useState(false);
   const [reveal, setReveal] = useState(0);
   const [heard, setHeard] = useState([]);
@@ -136,15 +143,17 @@ export default function App() {
     setReveal(0); setHeard([]);
   }
   function switchLedger(id) { setLedgerId(id); setTab('home'); setShowLedger(false); }
+  const perms = permsFor(viewRole, helperPerms);
+  function switchView(role) { setViewRole(role); setShowRoleSwitch(false); if (role === 'helper' && (tab === 'analysis' || tab === 'budget' || tab === 'profile')) setTab('home'); }
 
   const transcript = script.full.slice(0, Math.round(reveal * script.full.length));
-  const homeProps = { ledger, onOpenLedger: () => setShowLedger(true), onOpenAgent: () => { onHoldStart(); setTimeout(onHoldEnd, 3000); }, onOpenBudget: () => setTab('budget'), goal, onOpenGoal: () => setShowGoal(true), fixedDailyIncome: fixedDailyIncome(fixed) };
+  const homeProps = { ledger, onOpenLedger: () => setShowLedger(true), onOpenAgent: () => { onHoldStart(); setTimeout(onHoldEnd, 3000); }, onOpenBudget: () => setTab('budget'), goal, onOpenGoal: () => setShowGoal(true), fixedDailyIncome: fixedDailyIncome(fixed), perms, viewRole, onOpenRoleSwitch: () => setShowRoleSwitch(true), onExitHelper: () => switchView('admin') };
 
   let screen;
   if (tab === 'home') screen = isProject ? <ProjectHomeScreen {...homeProps} /> : <HomeScreen {...homeProps} expenseLog={expenseLog} />;
   else if (tab === 'analysis') screen = <AnalysisScreen />;
   else if (tab === 'budget') screen = <BudgetScreen ledgerId={ledgerId} />;
-  else screen = <ProfileScreen onOpenGoal={() => setShowGoal(true)} onOpenFixed={() => setShowFixed(true)} />;
+  else screen = <ProfileScreen onOpenGoal={() => setShowGoal(true)} onOpenFixed={() => setShowFixed(true)} onOpenPerms={() => setShowPerms(true)} />;
 
   return (
     <SafeAreaProvider>
@@ -152,12 +161,15 @@ export default function App() {
         <StatusBar style="dark" />
         <View style={{ flex: 1 }}>
           {screen}
+          {viewRole === 'helper' && <HelperBanner onExit={() => switchView('admin')} />}
           <HoldOverlay open={listening} transcript={transcript} heard={heard} />
         </View>
-        <TabBar tab={tab} setTab={setTab} listening={listening} onHoldStart={onHoldStart} onHoldEnd={onHoldEnd} />
+        <TabBar tab={tab} setTab={setTab} listening={listening} onHoldStart={onHoldStart} onHoldEnd={onHoldEnd} perms={perms} />
         <LedgerSheet open={showLedger} onClose={() => setShowLedger(false)} current={ledgerId} onPick={switchLedger} />
         <GoalConfigPage open={showGoal} onClose={() => setShowGoal(false)} goal={goal} setGoal={setGoal} />
         <FixedConfigSheet open={showFixed} onClose={() => setShowFixed(false)} config={fixed} setConfig={setFixed} />
+        <RoleSwitchSheet open={showRoleSwitch} onClose={() => setShowRoleSwitch(false)} viewRole={viewRole} onPick={switchView} />
+        <PermConfigSheet open={showPerms} onClose={() => setShowPerms(false)} perms={helperPerms} setPerms={setHelperPerms} />
       </SafeAreaView>
     </SafeAreaProvider>
   );
