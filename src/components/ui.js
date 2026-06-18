@@ -219,9 +219,26 @@ export function LineChart({ values, width = 320, height = 96, color = T.ink, acc
   );
 }
 
-// 数字滚动（M1 先直接显示，M2 接 Animated 缓动）
-export function useCountUp(value) {
-  return value;
+// 数字滚动缓动（requestAnimationFrame，ease-out cubic）
+export function useCountUp(value, dur = 600) {
+  const [d, setD] = useState(value);
+  const ref = useRef(value);
+  useEffect(() => {
+    const from = ref.current, to = value;
+    if (from === to) return;
+    const t0 = Date.now();
+    let raf;
+    const tick = () => {
+      const k = Math.min(1, (Date.now() - t0) / dur);
+      const e = 1 - Math.pow(1 - k, 3);
+      setD(Math.round(from + (to - from) * e));
+      if (k < 1) raf = requestAnimationFrame(tick);
+      else ref.current = to;
+    };
+    raf = requestAnimationFrame(tick);
+    return () => { if (raf) cancelAnimationFrame(raf); };
+  }, [value]);
+  return d;
 }
 
 // ── 分类方格（居中 / 左对齐 / 横排 三态）──────────────────────

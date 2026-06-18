@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
 import Icon from '../components/Icon';
-import { Card, CatIcon, Avatar, Money, Bar, RangeTabs, Sheet } from '../components/ui';
+import { Card, CatIcon, Avatar, Money, Bar, RangeTabs, Sheet, useCountUp } from '../components/ui';
 import { GoalCard } from '../components/GoalCard';
 import { T, shadow } from '../theme';
 import {
@@ -34,6 +34,8 @@ export default function HomeScreen({ ledger, expenseLog = [], onOpenAgent, goal,
   const curP = HERO.find((p) => p.k === heroPeriod) || HERO[0];
   const todayIncome = TODAY_INCOME + fixedDailyIncome;
   const monthBalance = MONTHS[CUR_MONTH].income - (MONTH_TOTAL + sumBumps);
+  const dispExp = useCountUp(curP.val);
+  const dispInc = useCountUp(todayIncome);
 
   // 方格按金额降序
   const order = [...GRID_CATS].sort((a, b) => (tileAmt(b) - tileAmt(a)) || GRID_CATS.indexOf(a) - GRID_CATS.indexOf(b));
@@ -79,14 +81,14 @@ export default function HomeScreen({ ledger, expenseLog = [], onOpenAgent, goal,
                   <Text style={hs.heroChipTxt}>明细</Text>
                 </Pressable>
               </View>
-              <Text style={hs.heroNum}><Text style={{ fontSize: 19, opacity: 0.8 }}>¥</Text>{curP.val.toLocaleString('zh-CN')}</Text>
+              <Text style={hs.heroNum}><Text style={{ fontSize: 19, opacity: 0.8 }}>¥</Text>{dispExp.toLocaleString('zh-CN')}</Text>
             </View>
             {perms.seeIncome !== false && (
               <>
                 <View style={{ width: StyleSheet.hairlineWidth, backgroundColor: 'rgba(255,255,255,0.18)', marginHorizontal: 2 }} />
                 <View style={{ flex: 1, paddingLeft: 16 }}>
                   <Text style={hs.heroLabel}>今日收入</Text>
-                  <Text style={[hs.heroNum, { color: T.ok }]}><Text style={{ fontSize: 19, opacity: 0.85 }}>¥</Text>{todayIncome.toLocaleString('zh-CN')}</Text>
+                  <Text style={[hs.heroNum, { color: T.ok }]}><Text style={{ fontSize: 19, opacity: 0.85 }}>¥</Text>{dispInc.toLocaleString('zh-CN')}</Text>
                 </View>
               </>
             )}
