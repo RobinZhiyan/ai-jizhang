@@ -1,7 +1,6 @@
-// ProfileScreen.js — 我的：成员权限 + 设置入口
+// ProfileScreen.js — 我的（协同成员 + 设置入口）M1 移植 profile.jsx
 import React from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from '../components/Icon';
 import { Card, Avatar, Pill } from '../components/ui';
 import { T } from '../theme';
@@ -16,19 +15,19 @@ const SETTINGS = [
 
 export default function ProfileScreen() {
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={['top']}>
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+    <View style={{ flex: 1, backgroundColor: T.bg }}>
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 30 }} showsVerticalScrollIndicator={false}>
         <Text style={ps.title}>我的</Text>
 
         <Card style={{ marginTop: 14 }} pad={0}>
           {Object.values(MEMBERS).map((m, i) => (
             <View key={m.id} style={[ps.member, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: T.hair }]}>
-              <Avatar member={m} size={42} />
+              <Avatar m={m} size={42} />
               <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={ps.memberName}>{m.name}</Text>
-                <Text style={ps.memberSub}>{m.id === 'dad' ? '我' : m.id === 'mom' ? '家人' : '孩子'}</Text>
+                <Text style={ps.name}>{m.name}</Text>
+                <Text style={ps.sub}>{m.id === 'dad' ? '我' : m.id === 'mom' ? '家人' : '孩子'}</Text>
               </View>
-              <Pill label={ROLE_LABEL[m.role]} color={m.role === 'admin' ? T.ok : T.muted} bg={m.role === 'admin' ? T.ok + '22' : T.surface2} />
+              <Pill color={m.role === 'admin' ? T.ok : T.muted} bg={m.role === 'admin' ? T.ok + '22' : T.surface2}>{ROLE_LABEL[m.role]}</Pill>
             </View>
           ))}
         </Card>
@@ -36,7 +35,7 @@ export default function ProfileScreen() {
         <Card style={{ marginTop: 16 }} pad={0}>
           {SETTINGS.map((it, i) => (
             <Pressable key={it.label} style={[ps.setting, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: T.hair }]}>
-              <View style={ps.settingIcon}><Icon name={it.icon} size={20} color={T.ink} sw={1.9} /></View>
+              <View style={ps.settingIcon}><Icon name={it.icon} size={20} sw={1.9} color={T.ink} /></View>
               <View style={{ flex: 1, marginLeft: 12 }}>
                 <Text style={ps.settingLabel}>{it.label}</Text>
                 <Text style={ps.settingSub}>{it.sub}</Text>
@@ -48,15 +47,15 @@ export default function ProfileScreen() {
 
         <Text style={ps.foot}>声记 · AI记账 · v1.0</Text>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const ps = StyleSheet.create({
   title: { fontSize: 26, fontWeight: '800', color: T.ink },
   member: { flexDirection: 'row', alignItems: 'center', padding: 16 },
-  memberName: { fontSize: 16, fontWeight: '600', color: T.ink },
-  memberSub: { fontSize: 12.5, color: T.muted, marginTop: 2 },
+  name: { fontSize: 16, fontWeight: '600', color: T.ink },
+  sub: { fontSize: 12.5, color: T.muted, marginTop: 2 },
   setting: { flexDirection: 'row', alignItems: 'center', padding: 15 },
   settingIcon: { width: 38, height: 38, borderRadius: 11, backgroundColor: T.surface2, alignItems: 'center', justifyContent: 'center' },
   settingLabel: { fontSize: 15.5, fontWeight: '500', color: T.ink },

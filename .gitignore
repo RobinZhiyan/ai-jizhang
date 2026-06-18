@@ -37,3 +37,6 @@ yarn-error.*
 
 # Claude Code local settings
 .claude/settings.local.json
+
+# 原型参考源码（解码自打包 HTML，移植依据）
+.proto-ref/

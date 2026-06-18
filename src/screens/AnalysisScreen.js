@@ -1,13 +1,12 @@
-// AnalysisScreen.js — 分析：收支双折线趋势 + 分类占比
+// AnalysisScreen.js — 数据分析（收支双折线趋势 + 本月分类占比）1:1 移植 analysis.jsx
 import React, { useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Dimensions } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Polyline, Circle, Line as SvgLine } from 'react-native-svg';
 import { Card, Segmented } from '../components/ui';
 import { T } from '../theme';
-import { TREND, MONTH_CATS, yuan } from '../data';
+import { TREND, MONTH_EXP_CATS, catMeta, yuan } from '../data';
 
-const CW = Dimensions.get('window').width - 16 * 2 - 36; // chart inner width
+const CW = Dimensions.get('window').width - 16 * 2 - 36;
 const CH = 170;
 
 function DualLine({ data }) {
@@ -35,19 +34,30 @@ function DualLine({ data }) {
   );
 }
 
+function Legend({ color, label }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+      <View style={{ width: 14, height: 3, borderRadius: 2, backgroundColor: color }} />
+      <Text style={{ fontSize: 12.5, color: T.muted }}>{label}</Text>
+    </View>
+  );
+}
+
 export default function AnalysisScreen() {
   const [range, setRange] = useState('week');
   const data = TREND[range];
-  const max = Math.max(...MONTH_CATS.map((c) => c.value));
+  const max = Math.max(...MONTH_EXP_CATS.map((c) => c.amt));
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={['top']}>
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+    <View style={{ flex: 1, backgroundColor: T.bg }}>
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 30 }} showsVerticalScrollIndicator={false}>
         <Text style={an.title}>数据分析</Text>
 
         <Card style={{ marginTop: 14 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
             <Text style={an.cardTitle}>收支趋势</Text>
-            <Segmented value={range} onChange={setRange} options={[{ key: 'week', label: '本周' }, { key: 'month', label: '本月' }]} />
+            <View style={{ width: 150 }}>
+              <Segmented value={range} onChange={setRange} options={[{ value: 'week', label: '本周' }, { value: 'month', label: '本月' }]} />
+            </View>
           </View>
           <DualLine data={data} />
           <View style={{ flexDirection: 'row', gap: 18, marginTop: 14 }}>
@@ -57,30 +67,21 @@ export default function AnalysisScreen() {
         </Card>
 
         <Text style={[an.cardTitle, { marginTop: 24, marginBottom: 12, marginLeft: 2 }]}>本月分类占比</Text>
-        <Card pad={16}>
-          {MONTH_CATS.slice(0, 8).map((c, i) => (
-            <View key={c.id} style={{ marginTop: i ? 13 : 0 }}>
+        <Card>
+          {MONTH_EXP_CATS.slice(0, 8).map((c, i) => (
+            <View key={c.cat} style={{ marginTop: i ? 13 : 0 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c.color }} />
-                <Text style={{ flex: 1, fontSize: 14, color: T.ink, marginLeft: 8 }}>{c.zh}</Text>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: T.ink }}>{yuan(c.value)}</Text>
+                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: catMeta(c.cat).color }} />
+                <Text style={{ flex: 1, fontSize: 14, color: T.ink, marginLeft: 8 }}>{c.name}</Text>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: T.ink }}>{yuan(c.amt)}</Text>
               </View>
               <View style={{ height: 6, borderRadius: 3, backgroundColor: T.track, overflow: 'hidden' }}>
-                <View style={{ width: `${(c.value / max) * 100}%`, height: '100%', borderRadius: 3, backgroundColor: c.color }} />
+                <View style={{ width: `${(c.amt / max) * 100}%`, height: '100%', borderRadius: 3, backgroundColor: catMeta(c.cat).color }} />
               </View>
             </View>
           ))}
         </Card>
       </ScrollView>
-    </SafeAreaView>
-  );
-}
-
-function Legend({ color, label }) {
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-      <View style={{ width: 14, height: 3, borderRadius: 2, backgroundColor: color }} />
-      <Text style={{ fontSize: 12.5, color: T.muted }}>{label}</Text>
     </View>
   );
 }
