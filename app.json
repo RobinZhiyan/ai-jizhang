@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "AI记账",
+    "slug": "ai-jizhang",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#E4E5EA"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.shengji.aijizhang"
+    },
+    "android": {
+      "package": "com.shengji.aijizhang"
+    },
+    "newArchEnabled": false
+  }
+}
