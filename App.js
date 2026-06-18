@@ -1,6 +1,6 @@
 // App.js — 根：5-Tab 导航（总览/分析/记账长按语音/预算/我的）+ 多账本 + 语音状态机
 // 1:1 移植自原型 app.jsx（去掉 iOS 设备外壳，RN 直接全屏）
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -108,6 +108,32 @@ function HoldOverlay({ open, transcript, heard }) {
   );
 }
 
+// 语音飞入：识别到的消费卡从底部飞起、缩小淡出（归位到类目）
+function FlyLayer({ items, onDone }) {
+  const anims = useRef(items.map(() => new Animated.Value(0))).current;
+  useEffect(() => {
+    Animated.stagger(120, anims.map((a) => Animated.timing(a, { toValue: 1, duration: 720, easing: Easing.bezier(0.5, 0, 0.25, 1), useNativeDriver: true }))).start(() => onDone && onDone());
+  }, []);
+  return (
+    <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, bottom: 130, alignItems: 'center', zIndex: 40 }}>
+      {items.map((it, i) => {
+        const m = catMeta(it.cat);
+        const a = anims[i];
+        const translateY = a.interpolate({ inputRange: [0, 1], outputRange: [0, -360] });
+        const scale = a.interpolate({ inputRange: [0, 1], outputRange: [1, 0.5] });
+        const opacity = a.interpolate({ inputRange: [0, 0.75, 1], outputRange: [1, 1, 0] });
+        return (
+          <Animated.View key={i} style={{ position: 'absolute', transform: [{ translateY }, { scale }], opacity, flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: T.surface, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 7, ...shadow, shadowOpacity: 0.2 }}>
+            <View style={{ width: 22, height: 22, borderRadius: 6, backgroundColor: m.color, alignItems: 'center', justifyContent: 'center' }}><Icon name={m.glyph} size={13} sw={2} color="#fff" /></View>
+            <Text style={{ fontSize: 12, fontWeight: '600', color: T.ink }}>{it.name}</Text>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: T.ink }}>¥{Math.abs(it.amt)}</Text>
+          </Animated.View>
+        );
+      })}
+    </View>
+  );
+}
+
 export default function App() {
   const [tab, setTab] = useState('home');
   const [ledgerId, setLedgerId] = useState('home');
@@ -121,6 +147,7 @@ export default function App() {
   const [showRoleSwitch, setShowRoleSwitch] = useState(false);
   const [showPerms, setShowPerms] = useState(false);
   const [listening, setListening] = useState(false);
+  const [flyItems, setFlyItems] = useState(null);
   const [reveal, setReveal] = useState(0);
   const [heard, setHeard] = useState([]);
   const [expenseLog, setExpenseLog] = useState([]);
@@ -141,6 +168,7 @@ export default function App() {
     clearTimers(); setListening(false);
     const items = script.chunks.map((c) => ({ name: c.name, cat: c.cat, amt: c.amt, who: 'dad' }));
     if (!isProject) setExpenseLog((l) => [...items, ...l]);
+    setFlyItems({ key: Date.now(), items });
     setReveal(0); setHeard([]);
   }
   function switchLedger(id) { setLedgerId(id); setTab('home'); setShowLedger(false); }
@@ -164,6 +192,7 @@ export default function App() {
           {screen}
           {viewRole === 'helper' && <HelperBanner onExit={() => switchView('admin')} />}
           <HoldOverlay open={listening} transcript={transcript} heard={heard} />
+          {flyItems && <FlyLayer key={flyItems.key} items={flyItems.items} onDone={() => setFlyItems(null)} />}
         </View>
         <TabBar tab={tab} setTab={setTab} listening={listening} onHoldStart={onHoldStart} onHoldEnd={onHoldEnd} perms={perms} />
         <LedgerSheet open={showLedger} onClose={() => setShowLedger(false)} current={ledgerId} onPick={switchLedger} />
