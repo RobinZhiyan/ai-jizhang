@@ -19,6 +19,7 @@ import ProjectHomeScreen from './src/screens/ProjectHomeScreen';
 import AnalysisScreen from './src/screens/AnalysisScreen';
 import BudgetScreen from './src/screens/BudgetScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
+import AAScreen from './src/screens/AAScreen';
 
 // 触觉反馈：优先 expo-haptics(真机重编译后细腻)，否则降级 RN 内置 Vibration
 let Haptics = null;
@@ -166,7 +167,10 @@ export default function App() {
   const [flyItems, setFlyItems] = useState(null);
   const [reveal, setReveal] = useState(0);
   const [heard, setHeard] = useState([]);
-  const [expenseLog, setExpenseLog] = useState([]);
+  const [transactions, setTransactions] = usePersistedState('vb_transactions', []);
+  const [showAA, setShowAA] = useState(false);
+  const addTx = (tx) => setTransactions((l) => [tx, ...l]);
+  const delTx = (id) => setTransactions((l) => l.filter((t) => t.id !== id));
   const [incomeLog, setIncomeLog] = useState([]);
   const [incomeReceipt, setIncomeReceipt] = useState(null);
   const [coinFly, setCoinFly] = useState(null);
@@ -200,7 +204,7 @@ export default function App() {
     const sc = scriptRef.current, mode = modeRef.current;
     const items = sc.chunks.map((c) => ({ name: c.name, cat: c.cat, amt: c.amt, who: c.who || 'dad' }));
     if (mode === 'expense') {
-      if (!isProject) setExpenseLog((l) => [...items, ...l]);
+      if (!isProject) items.forEach((it, k) => addTx({ id: 't' + Date.now() + '_' + k, name: it.name, amt: it.amt, cat: it.cat, who: 'dad', ts: Date.now() }));
       setFlyItems({ key: Date.now(), items });
     } else {
       const total = items.reduce((s, it) => s + it.amt, 0); // 收入>0 / 亏损<0
@@ -232,7 +236,7 @@ export default function App() {
   const homeProps = { ledger, onOpenLedger: () => setShowLedger(true), onOpenAgent: () => { onHoldStart(); setTimeout(onHoldEnd, 3000); }, onOpenBudget: () => setTab('budget'), goal, onOpenGoal: () => setShowGoal(true), fixedDailyIncome: fixedDailyIncome(fixed), perms, viewRole, onOpenRoleSwitch: () => setShowRoleSwitch(true), onExitHelper: () => switchView('admin'), incomeLog };
 
   let screen;
-  if (tab === 'home') screen = isProject ? <ProjectHomeScreen {...homeProps} /> : <HomeScreen {...homeProps} expenseLog={expenseLog} />;
+  if (tab === 'home') screen = isProject ? <ProjectHomeScreen {...homeProps} /> : <HomeScreen {...homeProps} transactions={transactions} onOpenAA={() => setShowAA(true)} />;
   else if (tab === 'analysis') screen = <AnalysisScreen />;
   else if (tab === 'budget') screen = <BudgetScreen ledgerId={ledgerId} />;
   else screen = <ProfileScreen onOpenGoal={() => setShowGoal(true)} onOpenFixed={() => setShowFixed(true)} onOpenPerms={() => setShowPerms(true)} />;
@@ -255,6 +259,7 @@ export default function App() {
         <RoleSwitchSheet open={showRoleSwitch} onClose={() => setShowRoleSwitch(false)} viewRole={viewRole} onPick={switchView} />
         <PermConfigSheet open={showPerms} onClose={() => setShowPerms(false)} perms={helperPerms} setPerms={setHelperPerms} />
         {incomeReceipt && <IncomeReceipt data={incomeReceipt} onClose={() => setIncomeReceipt(null)} />}
+        <AAScreen open={showAA} transactions={transactions} onAdd={addTx} onDelete={delTx} onClose={() => setShowAA(false)} />
       </SafeAreaView>
     </SafeAreaProvider>
   );

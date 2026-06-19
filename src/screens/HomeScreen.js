@@ -7,13 +7,10 @@ import { GoalCard } from '../components/GoalCard';
 import { usePersistedState } from '../usePersisted';
 import { CatTreemap, CatRose, CatSankey } from '../components/CatViz';
 import { T, shadow } from '../theme';
-import {
-  MEMBERS, GRID_CATS, RANGE_SPEND, RANGE_TOTAL, RANGE_LABEL, MONTH_TOTAL, MONTHS, CUR_MONTH,
-  TODAY_INCOME, TODAY_EXP_LIST, TODAY_INC_LIST, WEEK_EXP_LIST, MONTH_EXP_CATS, LASTMONTH_EXP_CATS,
-  catMeta, catOrders, yuan,
-} from '../data';
+import { MEMBERS, GRID_CATS, RANGE_LABEL, MONTHS, CUR_MONTH, TODAY_INCOME, catMeta, yuan } from '../data';
+import { catTotals, rangeTotal, inRange } from '../store';
 
-export default function HomeScreen({ ledger, expenseLog = [], incomeLog = [], onOpenAgent, goal, onOpenGoal, fixedDailyIncome = 0, perms = {}, viewRole, onOpenRoleSwitch, onExitHelper }) {
+export default function HomeScreen({ ledger, transactions = [], incomeLog = [], onOpenAgent, goal, onOpenGoal, onOpenAA, fixedDailyIncome = 0, perms = {}, viewRole, onOpenRoleSwitch, onExitHelper }) {
   const [range, setRange] = useState('today');
   const [heroPeriod, setHeroPeriod] = useState('today');
   const [periodOpen, setPeriodOpen] = useState(false);
@@ -26,37 +23,31 @@ export default function HomeScreen({ ledger, expenseLog = [], incomeLog = [], on
   const addCustom = () => { const name = draft.name.trim(); if (!name) return; setCustomCats((a) => [...a, { id: 'custom-' + Date.now(), zh: name, color: draft.color, glyph: draft.glyph, amt: 0 }]); setDraft({ name: '', color: '#0A84FF', glyph: 'spark' }); setShowAdd(false); };
   const removeCustom = (id) => setCustomCats((a) => a.filter((c) => c.id !== id));
 
-  // 语音记入的支出按分类累加
-  const bumps = {};
-  expenseLog.forEach((it) => { bumps[it.cat] = (bumps[it.cat] || 0) + it.amt; });
-  const sumBumps = expenseLog.reduce((s, it) => s + it.amt, 0);
-  const tileAmt = (id) => (RANGE_SPEND[range][id] || 0) + (bumps[id] || 0);
+  // 真实交易统计（按当前区间）
+  const totals = catTotals(transactions, range);
+  const tileAmt = (id) => totals[id] || 0;
 
-  // 收支大卡：支出可切区间
+  // 收支大卡：支出可切区间（真实统计）
   const HERO = [
-    { k: 'today', short: '今日', label: '今日支出', val: RANGE_TOTAL.today + sumBumps, items: [...TODAY_EXP_LIST], variant: 'tx' },
-    { k: 'week', short: '本周', label: '本周支出', val: RANGE_TOTAL.week + sumBumps, items: WEEK_EXP_LIST, variant: 'tx' },
-    { k: 'month', short: '本月', label: '本月支出', val: MONTH_TOTAL + sumBumps, items: MONTH_EXP_CATS, variant: 'cat' },
-    { k: 'last', short: '上月', label: '上月支出', val: MONTHS[CUR_MONTH - 1].expense, items: LASTMONTH_EXP_CATS, variant: 'cat' },
+    { k: 'today', short: '今日', label: '今日支出', val: rangeTotal(transactions, 'today') },
+    { k: 'week', short: '本周', label: '本周支出', val: rangeTotal(transactions, 'week') },
+    { k: 'month', short: '本月', label: '本月支出', val: rangeTotal(transactions, 'month') },
   ];
   const curP = HERO.find((p) => p.k === heroPeriod) || HERO[0];
   const gainSum = incomeLog.filter((it) => it.amt >= 0).reduce((s, it) => s + it.amt, 0);
   const lossSum = Math.abs(incomeLog.filter((it) => it.amt < 0).reduce((s, it) => s + it.amt, 0));
   const todayIncome = TODAY_INCOME + fixedDailyIncome + gainSum;
-  const monthBalance = MONTHS[CUR_MONTH].income - (MONTH_TOTAL + sumBumps + lossSum) + gainSum;
+  const monthBalance = MONTHS[CUR_MONTH].income - rangeTotal(transactions, 'month') + gainSum - lossSum;
   const dispExp = useCountUp(curP.val);
   const dispInc = useCountUp(todayIncome);
 
-  // 方格按金额降序
+  // 方格按金额降序（真实）
   const order = [...GRID_CATS].sort((a, b) => (tileAmt(b) - tileAmt(a)) || GRID_CATS.indexOf(a) - GRID_CATS.indexOf(b));
-  const namedSum = GRID_CATS.reduce((s, id) => s + (RANGE_SPEND[range][id] || 0), 0);
-  const otherAmt = Math.max(RANGE_TOTAL[range] - namedSum, 0) + (bumps.__other || 0);
+  const otherAmt = totals['__other'] || 0;
 
   function openCat(id) {
-    const items = id === '__other' ? [] : catOrders(id, range);
-    const b = bumps[id] || 0;
-    const list = b > 0 ? [...items, { name: '语音记账', cat: id, amt: b, who: 'dad' }] : items;
-    setDetail({ title: `${catMeta(id).zh} · ${RANGE_LABEL[range]}`, items: list });
+    const items = inRange(transactions, range).filter((t) => t.cat === id);
+    setDetail({ title: `${catMeta(id).zh} · ${RANGE_LABEL[range]}`, items });
   }
 
   const catList = [
@@ -70,7 +61,7 @@ export default function HomeScreen({ ledger, expenseLog = [], incomeLog = [], on
       <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 30 }} showsVerticalScrollIndicator={false}>
         {/* header */}
         <View style={hs.header}>
-          <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+          <Pressable onPress={onOpenAA} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
             <Text style={hs.title}>{ledger.name}</Text>
             <Icon name="chevron" size={16} sw={2.4} color={T.faint} style={{ transform: [{ rotate: '90deg' }] }} />
           </Pressable>
@@ -93,7 +84,7 @@ export default function HomeScreen({ ledger, expenseLog = [], incomeLog = [], on
                   <Text style={hs.heroLabel}>{curP.label}</Text>
                   <Icon name="chevron" size={12} sw={2.6} color={T.heroInk} style={{ transform: [{ rotate: periodOpen ? '-90deg' : '90deg' }], opacity: 0.55 }} />
                 </Pressable>
-                <Pressable onPress={() => setDetail({ title: `${curP.label}明细`, items: curP.items, sign: -1 })} style={hs.heroChip}>
+                <Pressable onPress={() => setDetail({ title: `${curP.label}明细`, items: inRange(transactions, heroPeriod) })} style={hs.heroChip}>
                   <Text style={hs.heroChipTxt}>明细</Text>
                 </Pressable>
               </View>
@@ -159,7 +150,7 @@ export default function HomeScreen({ ledger, expenseLog = [], incomeLog = [], on
         </View>
         {tileStyle === 'grid' ? (
           <View style={hs.grid}>
-            {order.map((id) => <Tile key={id} id={id} amount={tileAmt(id)} badge={bumps[id]} onPress={() => openCat(id)} />)}
+            {order.map((id) => <Tile key={id} id={id} amount={tileAmt(id)} onPress={() => openCat(id)} />)}
             <Tile id="__other" amount={otherAmt} onPress={() => openCat('__other')} />
             {customCats.map((c) => <Tile key={c.id} id={c.id} amount={c.amt || 0} meta={c} onPress={() => setDetail({ title: c.zh, items: [] })} />)}
             <Pressable onPress={() => setShowAdd(true)} style={[hs.tile, hs.addTile]}>
@@ -222,7 +213,7 @@ export default function HomeScreen({ ledger, expenseLog = [], incomeLog = [], on
 
       <Sheet open={showFeed} onClose={() => setShowFeed(false)} title="全部明细">
         <View style={{ backgroundColor: T.surface, borderRadius: T.radius, paddingHorizontal: 16, paddingVertical: 4, ...shadow }}>
-          {[...expenseLog, ...TODAY_EXP_LIST].slice(0, 12).map((it, i) => {
+          {transactions.slice(0, 20).map((it, i) => {
             const mm = it.who ? MEMBERS[it.who] : null;
             return (
               <View key={i} style={[hs.row, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: T.hair }]}>
