@@ -198,7 +198,7 @@ export default function App() {
   const commitRef = useRef(() => false);   // 指向最新 commitText，避免回调里 stale
   useEffect(() => {
     if (!hasVoice) return;
-    const flush = () => { if (pendingRef.current) { pendingRef.current = false; commitRef.current(liveTextRef.current); liveTextRef.current = ''; setLiveText(''); } };
+    const flush = () => { if (!pendingRef.current) return; pendingRef.current = false; const ok = commitRef.current(liveTextRef.current); liveTextRef.current = ''; setLiveText(''); if (!ok) setShowMock(true); };
     Voice.onSpeechPartialResults = (e) => { const t = e && e.value && e.value[0]; if (t != null) { liveTextRef.current = t; setLiveText(t); } };
     Voice.onSpeechResults = (e) => { const t = e && e.value && e.value[0]; console.log('[Voice] results:', t); if (t != null) { liveTextRef.current = t; setLiveText(t); } flush(); };
     Voice.onSpeechEnd = flush;
@@ -273,7 +273,7 @@ export default function App() {
       // 松开后等最终识别结果回调(onSpeechResults/End)再记账；1.6s 兜底用已收到的文本
       pendingRef.current = true;
       Voice.stop().catch(() => {});
-      setTimeout(() => { if (pendingRef.current) { pendingRef.current = false; commitText(liveTextRef.current); liveTextRef.current = ''; setLiveText(''); } }, 1600);
+      setTimeout(() => { if (!pendingRef.current) return; pendingRef.current = false; const ok = commitText(liveTextRef.current); liveTextRef.current = ''; setLiveText(''); if (!ok) setShowMock(true); }, 1600);
     } else {
       const sc = scriptRef.current, mode = modeRef.current;
       const items = sc.chunks.map((c) => ({ name: c.name, cat: c.cat, amt: c.amt, who: c.who || 'dad' }));
