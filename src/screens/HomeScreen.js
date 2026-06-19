@@ -40,12 +40,18 @@ export default function HomeScreen({ ledger, transactions = [], incomeLog = [], 
       cat: it.cat, amt: it.amt, name: it.name, who: it.who || 'dad',
     })));
   }, [flyItems ? flyItems.key : null]);
+  const wasFlyingRef = useRef(false);
+  useEffect(() => {
+    if (flyers.length > 0) wasFlyingRef.current = true;
+    else if (wasFlyingRef.current) { wasFlyingRef.current = false; onFlyDone && onFlyDone(); }
+  }, [flyers.length]);
   function landFly(f) {
-    onTxLand && onTxLand({ id: 't' + Date.now() + '_' + f.id, name: f.name, amt: f.amt, cat: f.cat, who: f.who, ts: Date.now() });
     setBadges((b) => ({ ...b, [f.gcat]: (b[f.gcat] || 0) + f.amt }));
     const t = setTimeout(() => setBadges((b) => { const n = { ...b }; delete n[f.gcat]; return n; }), 2900);
     badgeTimers.current.push(t);
-    setFlyers((fs) => { const left = fs.filter((x) => x.id !== f.id); if (!left.length) onFlyDone && onFlyDone(); return left; });
+    setFlyers((fs) => fs.filter((x) => x.id !== f.id));
+    // 入账与 onFlyDone 都脱离当前渲染提交：避免「渲染 FlyCard 时更新 App 组件」的 React 警告
+    setTimeout(() => { onTxLand && onTxLand({ id: 't' + Date.now() + '_' + f.id, name: f.name, amt: f.amt, cat: f.cat, who: f.who, ts: Date.now() }); }, 0);
   }
 
   // 真实交易统计（按当前区间）
