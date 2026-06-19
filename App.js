@@ -20,6 +20,7 @@ import AnalysisScreen from './src/screens/AnalysisScreen';
 import BudgetScreen from './src/screens/BudgetScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import AAScreen from './src/screens/AAScreen';
+import { Voice, hasVoice, parseSpeech, detectMode } from './src/voice';
 
 // 触觉反馈：优先 expo-haptics(真机重编译后细腻)，否则降级 RN 内置 Vibration
 let Haptics = null;
@@ -186,6 +187,16 @@ export default function App() {
   const modeRef = useRef('expense');
   const scriptRef = useRef(VOICE_SCRIPT);
   const scenarioRef = useRef(0);
+  const [liveText, setLiveText] = useState('');
+  const liveTextRef = useRef('');
+  useEffect(() => {
+    if (!hasVoice) return;
+    const onText = (e) => { const t = e && e.value && e.value[0]; if (t != null) { liveTextRef.current = t; setLiveText(t); } };
+    Voice.onSpeechPartialResults = onText;
+    Voice.onSpeechResults = onText;
+    Voice.onSpeechError = () => {};
+    return () => { try { Voice.destroy().then(() => Voice.removeAllListeners && Voice.removeAllListeners()); } catch (e) {} };
+  }, []);
   const ledger = LEDGERS[ledgerId];
   const isProject = ledger.kind === 'project';
 
@@ -199,17 +210,34 @@ export default function App() {
   }
   function onHoldStart() {
     if (tab !== 'home') setTab('home');
+    clearTimers(); setHeard([]); setReveal(0); setLiveText(''); setListening(true);
+    if (hasVoice) {
+      // 真实语音识别：按用户实际说的内容
+      liveTextRef.current = '';
+      Voice.start('zh-CN').catch(() => {});
+      return;
+    }
+    // 降级（无原生语音模块时，用演示脚本）
     const pick = pickScenario();
     modeRef.current = pick.mode; scriptRef.current = pick.sc; setActiveScript(pick.sc);
-    clearTimers(); setHeard([]); setReveal(0); setListening(true);
     const DUR = 2600, steps = 40;
     for (let i = 1; i <= steps; i++) timers.current.push(setTimeout(() => setReveal(i / steps), (DUR / steps) * i));
     pick.sc.chunks.forEach((ch) => timers.current.push(setTimeout(() => setHeard((h) => [...h, ch]), DUR * ch.at)));
   }
   function onHoldEnd() {
     clearTimers(); setListening(false); buzz();
-    const sc = scriptRef.current, mode = modeRef.current;
-    const items = sc.chunks.map((c) => ({ name: c.name, cat: c.cat, amt: c.amt, who: c.who || 'dad' }));
+    let items, mode;
+    if (hasVoice) {
+      Voice.stop().catch(() => {});
+      const text = liveTextRef.current || ''; liveTextRef.current = '';
+      const parsed = parseSpeech(text);
+      if (!parsed.length) { setReveal(0); setHeard([]); setLiveText(''); return; }
+      mode = isProject ? 'expense' : detectMode(text);
+      items = parsed.map((it) => ({ name: it.name, cat: it.cat, amt: mode === 'loss' ? -Math.abs(it.amt) : it.amt, who: 'dad' }));
+    } else {
+      const sc = scriptRef.current; mode = modeRef.current;
+      items = sc.chunks.map((c) => ({ name: c.name, cat: c.cat, amt: c.amt, who: c.who || 'dad' }));
+    }
     if (mode === 'expense') {
       if (isProject) setFlyItems({ key: Date.now(), items });
       else setHomeFly({ key: Date.now(), items }); // 家庭账本：卡片飞向类目方格，落定瞬间逐笔真实入账
@@ -239,7 +267,7 @@ export default function App() {
   const perms = permsFor(viewRole, helperPerms);
   function switchView(role) { setViewRole(role); setShowRoleSwitch(false); if (role === 'helper' && (tab === 'analysis' || tab === 'budget' || tab === 'profile')) setTab('home'); }
 
-  const transcript = activeScript.full.slice(0, Math.round(reveal * activeScript.full.length));
+  const transcript = hasVoice ? liveText : activeScript.full.slice(0, Math.round(reveal * activeScript.full.length));
   const homeProps = { ledger, onOpenLedger: () => setShowLedger(true), onOpenAgent: () => { onHoldStart(); setTimeout(onHoldEnd, 3000); }, onOpenBudget: () => setTab('budget'), goal, onOpenGoal: () => setShowGoal(true), fixedDailyIncome: fixedDailyIncome(fixed), perms, viewRole, onOpenRoleSwitch: () => setShowRoleSwitch(true), onExitHelper: () => switchView('admin'), incomeLog };
 
   let screen;
@@ -255,7 +283,7 @@ export default function App() {
         <View style={{ flex: 1 }}>
           {screen}
           {viewRole === 'helper' && <HelperBanner onExit={() => switchView('admin')} />}
-          <HoldOverlay open={listening} transcript={transcript} heard={heard} />
+          <HoldOverlay open={listening} transcript={transcript} heard={hasVoice ? parseSpeech(liveText) : heard} />
           {flyItems && <FlyLayer key={flyItems.key} items={flyItems.items} onDone={() => setFlyItems(null)} />}
           {coinFly && <CoinFly key={coinFly.key} kind={coinFly.kind} onLand={() => { buzz('success'); setIncomeReceipt(coinFly.data); }} onDone={() => setCoinFly(null)} />}
         </View>

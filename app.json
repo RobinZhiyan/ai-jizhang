@@ -13,8 +13,18 @@
       "bundleIdentifier": "com.shengji.aijizhang"
     },
     "android": {
-      "package": "com.shengji.aijizhang"
+      "package": "com.shengji.aijizhang",
+      "permissions": ["android.permission.RECORD_AUDIO"]
     },
-    "newArchEnabled": false
+    "newArchEnabled": false,
+    "plugins": [
+      [
+        "@react-native-voice/voice",
+        {
+          "microphonePermission": "允许「AI记账」使用麦克风进行语音记账",
+          "speechRecognitionPermission": "允许「AI记账」使用语音识别，按你说的话自动记账"
+        }
+      ]
+    ]
   }
 }
