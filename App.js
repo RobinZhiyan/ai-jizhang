@@ -194,12 +194,15 @@ export default function App() {
   const scenarioRef = useRef(0);
   const [liveText, setLiveText] = useState('');
   const liveTextRef = useRef('');
+  const pendingRef = useRef(false);        // 松开后是否在等最终识别结果
+  const commitRef = useRef(() => false);   // 指向最新 commitText，避免回调里 stale
   useEffect(() => {
     if (!hasVoice) return;
-    const onText = (e) => { const t = e && e.value && e.value[0]; if (t != null) { liveTextRef.current = t; setLiveText(t); } };
-    Voice.onSpeechPartialResults = onText;
-    Voice.onSpeechResults = onText;
-    Voice.onSpeechError = () => {};
+    const flush = () => { if (pendingRef.current) { pendingRef.current = false; commitRef.current(liveTextRef.current); liveTextRef.current = ''; setLiveText(''); } };
+    Voice.onSpeechPartialResults = (e) => { const t = e && e.value && e.value[0]; if (t != null) { liveTextRef.current = t; setLiveText(t); } };
+    Voice.onSpeechResults = (e) => { const t = e && e.value && e.value[0]; console.log('[Voice] results:', t); if (t != null) { liveTextRef.current = t; setLiveText(t); } flush(); };
+    Voice.onSpeechEnd = flush;
+    Voice.onSpeechError = (e) => { console.log('[Voice] error:', JSON.stringify(e && (e.error || e))); flush(); };
     return () => { try { Voice.destroy().then(() => Voice.removeAllListeners && Voice.removeAllListeners()); } catch (e) {} };
   }, []);
   const ledger = LEDGERS[ledgerId];
@@ -263,12 +266,14 @@ export default function App() {
     processVoiceItems(items, mode);
     return true;
   }
+  commitRef.current = commitText; // 每次渲染指向最新闭包，供语音回调调用
   function onHoldEnd() {
     clearTimers(); setListening(false); buzz();
     if (hasVoice) {
+      // 松开后等最终识别结果回调(onSpeechResults/End)再记账；1.6s 兜底用已收到的文本
+      pendingRef.current = true;
       Voice.stop().catch(() => {});
-      const text = liveTextRef.current || ''; liveTextRef.current = '';
-      commitText(text);
+      setTimeout(() => { if (pendingRef.current) { pendingRef.current = false; commitText(liveTextRef.current); liveTextRef.current = ''; setLiveText(''); } }, 1600);
     } else {
       const sc = scriptRef.current, mode = modeRef.current;
       const items = sc.chunks.map((c) => ({ name: c.name, cat: c.cat, amt: c.amt, who: c.who || 'dad' }));
