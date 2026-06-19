@@ -1,7 +1,7 @@
 // App.js — 根：5-Tab 导航（总览/分析/记账长按语音/预算/我的）+ 多账本 + 语音状态机
 // 1:1 移植自原型 app.jsx（去掉 iOS 设备外壳，RN 直接全屏）
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, Pressable, StyleSheet, Animated, Easing, Vibration, LogBox } from 'react-native';
+import { View, Text, Pressable, TextInput, ScrollView, StyleSheet, Animated, Easing, Vibration, LogBox } from 'react-native';
 
 // 抑制 @react-native-voice/voice 在 Android 的 NativeEventEmitter 非致命警告
 LogBox.ignoreLogs(['new NativeEventEmitter', 'EventEmitter.removeListener']);
@@ -180,6 +180,8 @@ export default function App() {
   const [transactions, setTransactions] = usePersistedState('vb_transactions', []);
   const [showAA, setShowAA] = useState(false);
   const [homeFly, setHomeFly] = useState(null); // 家庭账本语音飞入队列（落定逐笔入账）
+  const [showMock, setShowMock] = useState(false);
+  const [mockText, setMockText] = useState('');
   const addTx = (tx) => setTransactions((l) => [tx, ...l]);
   const delTx = (id) => setTransactions((l) => l.filter((t) => t.id !== id));
   const [incomeLog, setIncomeLog] = useState([]);
@@ -227,20 +229,7 @@ export default function App() {
     for (let i = 1; i <= steps; i++) timers.current.push(setTimeout(() => setReveal(i / steps), (DUR / steps) * i));
     pick.sc.chunks.forEach((ch) => timers.current.push(setTimeout(() => setHeard((h) => [...h, ch]), DUR * ch.at)));
   }
-  function onHoldEnd() {
-    clearTimers(); setListening(false); buzz();
-    let items, mode;
-    if (hasVoice) {
-      Voice.stop().catch(() => {});
-      const text = liveTextRef.current || ''; liveTextRef.current = '';
-      const parsed = parseSpeech(text);
-      if (!parsed.length) { setReveal(0); setHeard([]); setLiveText(''); return; }
-      mode = isProject ? 'expense' : detectMode(text);
-      items = parsed.map((it) => ({ name: it.name, cat: it.cat, amt: mode === 'loss' ? -Math.abs(it.amt) : it.amt, who: 'dad' }));
-    } else {
-      const sc = scriptRef.current; mode = modeRef.current;
-      items = sc.chunks.map((c) => ({ name: c.name, cat: c.cat, amt: c.amt, who: c.who || 'dad' }));
-    }
+  function processVoiceItems(items, mode) {
     if (mode === 'expense') {
       if (isProject) setFlyItems({ key: Date.now(), items });
       else setHomeFly({ key: Date.now(), items }); // 家庭账本：卡片飞向类目方格，落定瞬间逐笔真实入账
@@ -264,14 +253,35 @@ export default function App() {
       const receiptData = { kind: mode === 'loss' ? 'loss' : 'gain', item, incomeBefore, incomeAfter: incomeBefore + total, balanceBefore, balanceAfter: balanceBefore + total, goal: gd };
       setCoinFly({ key: Date.now(), kind: mode === 'loss' ? 'loss' : 'gain', data: receiptData });
     }
-    setReveal(0); setHeard([]);
+  }
+  // 把一段文字（真实语音识别结果 or 模拟语音输入）按真实流程记账：解析→归类→飞入/收支
+  function commitText(text) {
+    const parsed = parseSpeech(text);
+    if (!parsed.length) return false;
+    const mode = isProject ? 'expense' : detectMode(text);
+    const items = parsed.map((it) => ({ name: it.name, cat: it.cat, amt: mode === 'loss' ? -Math.abs(it.amt) : it.amt, who: 'dad' }));
+    processVoiceItems(items, mode);
+    return true;
+  }
+  function onHoldEnd() {
+    clearTimers(); setListening(false); buzz();
+    if (hasVoice) {
+      Voice.stop().catch(() => {});
+      const text = liveTextRef.current || ''; liveTextRef.current = '';
+      commitText(text);
+    } else {
+      const sc = scriptRef.current, mode = modeRef.current;
+      const items = sc.chunks.map((c) => ({ name: c.name, cat: c.cat, amt: c.amt, who: c.who || 'dad' }));
+      processVoiceItems(items, mode);
+    }
+    setReveal(0); setHeard([]); setLiveText('');
   }
   function switchLedger(id) { setLedgerId(id); setTab('home'); setShowLedger(false); }
   const perms = permsFor(viewRole, helperPerms);
   function switchView(role) { setViewRole(role); setShowRoleSwitch(false); if (role === 'helper' && (tab === 'analysis' || tab === 'budget' || tab === 'profile')) setTab('home'); }
 
   const transcript = hasVoice ? liveText : activeScript.full.slice(0, Math.round(reveal * activeScript.full.length));
-  const homeProps = { ledger, onOpenLedger: () => setShowLedger(true), onOpenAgent: () => { onHoldStart(); setTimeout(onHoldEnd, 3000); }, onOpenBudget: () => setTab('budget'), goal, onOpenGoal: () => setShowGoal(true), fixedDailyIncome: fixedDailyIncome(fixed), perms, viewRole, onOpenRoleSwitch: () => setShowRoleSwitch(true), onExitHelper: () => switchView('admin'), incomeLog };
+  const homeProps = { ledger, onOpenLedger: () => setShowLedger(true), onOpenAgent: () => setShowMock(true), onOpenBudget: () => setTab('budget'), goal, onOpenGoal: () => setShowGoal(true), fixedDailyIncome: fixedDailyIncome(fixed), perms, viewRole, onOpenRoleSwitch: () => setShowRoleSwitch(true), onExitHelper: () => switchView('admin'), incomeLog };
 
   let screen;
   if (tab === 'home') screen = isProject ? <ProjectHomeScreen {...homeProps} /> : <HomeScreen {...homeProps} transactions={transactions} flyItems={homeFly} onTxLand={addTx} onFlyDone={() => setHomeFly(null)} />;
@@ -298,6 +308,32 @@ export default function App() {
         <PermConfigSheet open={showPerms} onClose={() => setShowPerms(false)} perms={helperPerms} setPerms={setHelperPerms} />
         {incomeReceipt && <IncomeReceipt data={incomeReceipt} onClose={() => setIncomeReceipt(null)} />}
         <AAScreen open={showAA} onClose={() => setShowAA(false)} />
+        <Sheet open={showMock} onClose={() => setShowMock(false)} title="模拟语音 · 测试记账">
+          <Text style={{ fontSize: 13, color: T.muted, marginBottom: 12, lineHeight: 19 }}>
+            模拟器没有真麦克风，这里输入你要「说」的话，走与真实语音完全相同的流程：识别金额 → 自动归类 → 飞入入账（多笔用空格分隔）。
+          </Text>
+          <View style={{ backgroundColor: T.surface, borderRadius: T.radius, padding: 14, ...shadow }}>
+            <TextInput value={mockText} onChangeText={setMockText} placeholder="如：打车30 外卖20 奶茶15" placeholderTextColor={T.faint}
+              onSubmitEditing={() => { if (commitText(mockText)) { setMockText(''); setShowMock(false); } }} returnKeyType="done"
+              style={{ backgroundColor: T.surface2, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16, color: T.ink }} />
+            <Pressable onPress={() => { if (commitText(mockText)) { setMockText(''); setShowMock(false); } }}
+              style={{ marginTop: 12, height: 48, borderRadius: 14, backgroundColor: T.accent, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 }}>
+              <Icon name="mic" size={18} sw={2} color={T.accentInk} />
+              <Text style={{ color: T.accentInk, fontSize: 15.5, fontWeight: '600' }}>识别 · 记一笔</Text>
+            </Pressable>
+          </View>
+          <Text style={{ fontSize: 12.5, fontWeight: '600', color: T.muted, marginTop: 18, marginBottom: 10 }}>快捷测试样本（点一下即记账）</Text>
+          <View style={{ gap: 8 }}>
+            {['打车30 外卖20 奶茶15', '超市买菜88 水果46', '工资到账5000', '股票亏损1500'].map((s) => (
+              <Pressable key={s} onPress={() => { commitText(s); setShowMock(false); }}
+                style={{ backgroundColor: T.surface, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, flexDirection: 'row', alignItems: 'center', gap: 10, ...shadow }}>
+                <Icon name="mic" size={17} sw={2} color={T.blue} />
+                <Text style={{ flex: 1, fontSize: 14.5, color: T.ink }}>{s}</Text>
+                <Icon name="chevron" size={16} color={T.faint} />
+              </Pressable>
+            ))}
+          </View>
+        </Sheet>
       </SafeAreaView>
     </SafeAreaProvider>
   );
