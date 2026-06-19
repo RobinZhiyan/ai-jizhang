@@ -14,7 +14,8 @@ export function parseSpeech(text) {
   const re = /([^\d、，,;；。\s]+(?:\s[^\d、，,;；。]+?)?)\s*(\d+(?:\.\d+)?)\s*(?:元|块钱|块|毛|角|圆)?/g;
   let m;
   while ((m = re.exec(text)) !== null) {
-    const name = m[1].replace(/[、，,;；和又还花了用买充]/g, '').trim();
+    let name = m[1].replace(/[、，,;；。]/g, '').replace(/^(今天|昨天|刚才|刚刚|刚|我|帮我|给我|顺便|然后)/, '').replace(/(买了|买|花了|花|用了|用|充了|充|付了|付|又|还|和)/g, '').trim();
+    if (!name) name = m[1].replace(/[、，,;；。\s]/g, '').trim();
     const amt = Math.round(parseFloat(m[2]));
     if (amt > 0 && name) items.push({ name, amt, cat: autoCategorize(name) });
   }

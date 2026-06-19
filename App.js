@@ -1,7 +1,10 @@
 // App.js — 根：5-Tab 导航（总览/分析/记账长按语音/预算/我的）+ 多账本 + 语音状态机
 // 1:1 移植自原型 app.jsx（去掉 iOS 设备外壳，RN 直接全屏）
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, Pressable, StyleSheet, Animated, Easing, Vibration } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Animated, Easing, Vibration, LogBox } from 'react-native';
+
+// 抑制 @react-native-voice/voice 在 Android 的 NativeEventEmitter 非致命警告
+LogBox.ignoreLogs(['new NativeEventEmitter', 'EventEmitter.removeListener']);
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import Icon from './src/components/Icon';
