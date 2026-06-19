@@ -11,10 +11,10 @@ export function CoinFly({ kind = 'gain', onLand, onDone }) {
   const fly = useRef(new Animated.Value(0)).current;
   const burst = useRef(new Animated.Value(0)).current;
   const parts = useRef(
-    Array.from({ length: 14 }, (_, i) => {
-      const ang = (i / 14) * Math.PI * 2;
-      const dist = 50 + (i % 3) * 22;
-      return { dx: Math.cos(ang) * dist, dy: Math.sin(ang) * dist - 12, size: 7 + (i % 4) * 2 };
+    Array.from({ length: 18 }, (_, i) => {
+      const ang = (i / 18) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+      const dist = 44 + Math.random() * 54;
+      return { dx: Math.cos(ang) * dist, dy: Math.sin(ang) * dist - 12, size: 6 + Math.random() * 5 };
     })
   ).current;
 
