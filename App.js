@@ -71,26 +71,32 @@ function TabBar({ tab, setTab, listening, onHoldStart, onHoldEnd, perms = {} }) 
   );
 }
 
-function LedgerSheet({ open, onClose, current, onPick }) {
+// 「家庭日常」板块：三个功能入口（AA 记账 / 家庭日常 / 敬请期待）
+function LedgerSheet({ open, onClose, onOpenAA }) {
+  const PANELS = [
+    { id: 'aa', name: 'AA 记账', desc: '说一笔 / 输入一笔 · 自动识别金额并归类', icon: 'plus', tint: T.accent, iconInk: T.accentInk, pill: '记一笔', pc: T.blue, pb: 'rgba(10,132,255,0.12)', go: () => { onClose(); onOpenAA && onOpenAA(); } },
+    { id: 'home', name: '家庭日常', desc: '家庭共享账本 · 当前使用中', icon: 'house', tint: T.blue, iconInk: '#fff', pill: '当前', pc: T.ok, pb: 'rgba(48,209,88,0.14)', go: onClose },
+    { id: 'soon', name: '敬请期待', desc: '更多场景账本 · 装修 / 开店 / 活动', icon: 'spark', tint: T.faint, iconInk: '#fff', pill: '即将开放', pc: T.muted, pb: 'rgba(120,120,128,0.16)', soon: true },
+  ];
   return (
-    <Sheet open={open} onClose={onClose} title="切换账本 / 项目">
+    <Sheet open={open} onClose={onClose} title="家庭日常">
       <View style={{ gap: 10 }}>
-        {Object.values(LEDGERS).map((lg) => {
-          const on = lg.id === current; const p = pct(lg.spent, lg.budget);
-          return (
-            <Pressable key={lg.id} onPress={() => onPick(lg.id)} style={{ borderWidth: 1.5, borderColor: on ? T.ink : 'transparent', backgroundColor: T.surface, borderRadius: T.radius, padding: 15, flexDirection: 'row', alignItems: 'center', gap: 12, ...shadow }}>
-              <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: lg.tint, alignItems: 'center', justifyContent: 'center' }}><Icon name={lg.icon} size={21} sw={2} color="#fff" /></View>
-              <View style={{ flex: 1 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-                  <Text style={{ fontSize: 16, fontWeight: '600', color: T.ink }}>{lg.name}</Text>
-                  <Pill color={lg.kind === 'project' ? T.warn : T.blue} bg={lg.kind === 'project' ? 'rgba(255,149,0,0.14)' : 'rgba(10,132,255,0.12)'}>{lg.kind === 'project' ? '项目' : '日常'}</Pill>
-                </View>
-                <Text style={{ fontSize: 12.5, color: T.muted, marginTop: 3 }}>{yuan(lg.spent)} / {yuan(lg.budget)} · 已用 {Math.round(p * 100)}%</Text>
+        {PANELS.map((p) => (
+          <Pressable key={p.id} onPress={p.soon ? undefined : p.go} disabled={!!p.soon}
+            style={{ opacity: p.soon ? 0.6 : 1, backgroundColor: T.surface, borderRadius: T.radius, padding: 15, flexDirection: 'row', alignItems: 'center', gap: 12, ...shadow }}>
+            <View style={{ width: 42, height: 42, borderRadius: 12, backgroundColor: p.tint, alignItems: 'center', justifyContent: 'center' }}>
+              <Icon name={p.icon} size={21} sw={2} color={p.iconInk} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+                <Text style={{ fontSize: 16, fontWeight: '600', color: T.ink }}>{p.name}</Text>
+                <Pill color={p.pc} bg={p.pb}>{p.pill}</Pill>
               </View>
-              {on && <Icon name="check" size={22} sw={2.4} color={T.ok} />}
-            </Pressable>
-          );
-        })}
+              <Text style={{ fontSize: 12.5, color: T.muted, marginTop: 3 }}>{p.desc}</Text>
+            </View>
+            {!p.soon && <Icon name="chevron" size={20} sw={2.2} color={T.faint} />}
+          </Pressable>
+        ))}
       </View>
     </Sheet>
   );
@@ -169,6 +175,7 @@ export default function App() {
   const [heard, setHeard] = useState([]);
   const [transactions, setTransactions] = usePersistedState('vb_transactions', []);
   const [showAA, setShowAA] = useState(false);
+  const [homeFly, setHomeFly] = useState(null); // 家庭账本语音飞入队列（落定逐笔入账）
   const addTx = (tx) => setTransactions((l) => [tx, ...l]);
   const delTx = (id) => setTransactions((l) => l.filter((t) => t.id !== id));
   const [incomeLog, setIncomeLog] = useState([]);
@@ -204,8 +211,8 @@ export default function App() {
     const sc = scriptRef.current, mode = modeRef.current;
     const items = sc.chunks.map((c) => ({ name: c.name, cat: c.cat, amt: c.amt, who: c.who || 'dad' }));
     if (mode === 'expense') {
-      if (!isProject) items.forEach((it, k) => addTx({ id: 't' + Date.now() + '_' + k, name: it.name, amt: it.amt, cat: it.cat, who: 'dad', ts: Date.now() }));
-      setFlyItems({ key: Date.now(), items });
+      if (isProject) setFlyItems({ key: Date.now(), items });
+      else setHomeFly({ key: Date.now(), items }); // 家庭账本：卡片飞向类目方格，落定瞬间逐笔真实入账
     } else {
       const total = items.reduce((s, it) => s + it.amt, 0); // 收入>0 / 亏损<0
       const first = items[0];
@@ -236,7 +243,7 @@ export default function App() {
   const homeProps = { ledger, onOpenLedger: () => setShowLedger(true), onOpenAgent: () => { onHoldStart(); setTimeout(onHoldEnd, 3000); }, onOpenBudget: () => setTab('budget'), goal, onOpenGoal: () => setShowGoal(true), fixedDailyIncome: fixedDailyIncome(fixed), perms, viewRole, onOpenRoleSwitch: () => setShowRoleSwitch(true), onExitHelper: () => switchView('admin'), incomeLog };
 
   let screen;
-  if (tab === 'home') screen = isProject ? <ProjectHomeScreen {...homeProps} /> : <HomeScreen {...homeProps} transactions={transactions} onOpenAA={() => setShowAA(true)} />;
+  if (tab === 'home') screen = isProject ? <ProjectHomeScreen {...homeProps} /> : <HomeScreen {...homeProps} transactions={transactions} flyItems={homeFly} onTxLand={addTx} onFlyDone={() => setHomeFly(null)} />;
   else if (tab === 'analysis') screen = <AnalysisScreen />;
   else if (tab === 'budget') screen = <BudgetScreen ledgerId={ledgerId} />;
   else screen = <ProfileScreen onOpenGoal={() => setShowGoal(true)} onOpenFixed={() => setShowFixed(true)} onOpenPerms={() => setShowPerms(true)} />;
@@ -253,7 +260,7 @@ export default function App() {
           {coinFly && <CoinFly key={coinFly.key} kind={coinFly.kind} onLand={() => { buzz('success'); setIncomeReceipt(coinFly.data); }} onDone={() => setCoinFly(null)} />}
         </View>
         <TabBar tab={tab} setTab={setTab} listening={listening} onHoldStart={onHoldStart} onHoldEnd={onHoldEnd} perms={perms} />
-        <LedgerSheet open={showLedger} onClose={() => setShowLedger(false)} current={ledgerId} onPick={switchLedger} />
+        <LedgerSheet open={showLedger} onClose={() => setShowLedger(false)} onOpenAA={() => setShowAA(true)} />
         <GoalConfigPage open={showGoal} onClose={() => setShowGoal(false)} goal={goal} setGoal={setGoal} />
         <FixedConfigSheet open={showFixed} onClose={() => setShowFixed(false)} config={fixed} setConfig={setFixed} />
         <RoleSwitchSheet open={showRoleSwitch} onClose={() => setShowRoleSwitch(false)} viewRole={viewRole} onPick={switchView} />

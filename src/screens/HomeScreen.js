@@ -1,6 +1,6 @@
 // HomeScreen.js — 首页（1:1 移植 home.jsx 的 M1 核心：账本头 / 收支大卡(区间) / 小目标 / 分类方格 / 明细）
-import React, { useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, TextInput } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, Text, ScrollView, Pressable, StyleSheet, TextInput, Animated, Easing } from 'react-native';
 import Icon from '../components/Icon';
 import { Card, CatIcon, Avatar, Money, Bar, RangeTabs, Sheet, useCountUp } from '../components/ui';
 import { GoalCard } from '../components/GoalCard';
@@ -10,7 +10,7 @@ import { T, shadow } from '../theme';
 import { MEMBERS, GRID_CATS, RANGE_LABEL, MONTHS, CUR_MONTH, TODAY_INCOME, catMeta, yuan } from '../data';
 import { catTotals, rangeTotal, inRange } from '../store';
 
-export default function HomeScreen({ ledger, transactions = [], incomeLog = [], onOpenAgent, goal, onOpenGoal, onOpenAA, fixedDailyIncome = 0, perms = {}, viewRole, onOpenRoleSwitch, onExitHelper }) {
+export default function HomeScreen({ ledger, transactions = [], incomeLog = [], onOpenAgent, goal, onOpenGoal, onOpenLedger, flyItems, onTxLand, onFlyDone, fixedDailyIncome = 0, perms = {}, viewRole, onOpenRoleSwitch, onExitHelper }) {
   const [range, setRange] = useState('today');
   const [heroPeriod, setHeroPeriod] = useState('today');
   const [periodOpen, setPeriodOpen] = useState(false);
@@ -22,6 +22,31 @@ export default function HomeScreen({ ledger, transactions = [], incomeLog = [], 
   const [draft, setDraft] = useState({ name: '', color: '#0A84FF', glyph: 'spark' });
   const addCustom = () => { const name = draft.name.trim(); if (!name) return; setCustomCats((a) => [...a, { id: 'custom-' + Date.now(), zh: name, color: draft.color, glyph: draft.glyph, amt: 0 }]); setDraft({ name: '', color: '#0A84FF', glyph: 'spark' }); setShowAdd(false); };
   const removeCustom = (id) => setCustomCats((a) => a.filter((c) => c.id !== id));
+
+  // 语音飞入（1:1 还原原型 useFlyIn）：卡片飞向各类目方格中心 → 落定瞬间方格金额跳动 + 「+¥」气泡 + 真实入账
+  const tileLayouts = useRef({});       // { catId: {x,y,width,height} 相对 grid }
+  const [gridW, setGridW] = useState(0);
+  const [flyers, setFlyers] = useState([]);
+  const [badges, setBadges] = useState({});
+  const flyKeyRef = useRef(null);
+  const badgeTimers = useRef([]);
+  useEffect(() => () => badgeTimers.current.forEach(clearTimeout), []);
+  useEffect(() => {
+    if (!flyItems || !flyItems.items || !flyItems.items.length || flyKeyRef.current === flyItems.key) return;
+    flyKeyRef.current = flyItems.key;
+    setFlyers(flyItems.items.map((it, i) => ({
+      id: flyItems.key + '-' + i,
+      gcat: GRID_CATS.includes(it.cat) ? it.cat : '__other',
+      cat: it.cat, amt: it.amt, name: it.name, who: it.who || 'dad',
+    })));
+  }, [flyItems ? flyItems.key : null]);
+  function landFly(f) {
+    onTxLand && onTxLand({ id: 't' + Date.now() + '_' + f.id, name: f.name, amt: f.amt, cat: f.cat, who: f.who, ts: Date.now() });
+    setBadges((b) => ({ ...b, [f.gcat]: (b[f.gcat] || 0) + f.amt }));
+    const t = setTimeout(() => setBadges((b) => { const n = { ...b }; delete n[f.gcat]; return n; }), 2900);
+    badgeTimers.current.push(t);
+    setFlyers((fs) => { const left = fs.filter((x) => x.id !== f.id); if (!left.length) onFlyDone && onFlyDone(); return left; });
+  }
 
   // 真实交易统计（按当前区间）
   const totals = catTotals(transactions, range);
@@ -61,7 +86,7 @@ export default function HomeScreen({ ledger, transactions = [], incomeLog = [], 
       <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 30 }} showsVerticalScrollIndicator={false}>
         {/* header */}
         <View style={hs.header}>
-          <Pressable onPress={onOpenAA} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+          <Pressable onPress={onOpenLedger} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
             <Text style={hs.title}>{ledger.name}</Text>
             <Icon name="chevron" size={16} sw={2.4} color={T.faint} style={{ transform: [{ rotate: '90deg' }] }} />
           </Pressable>
@@ -149,15 +174,20 @@ export default function HomeScreen({ ledger, transactions = [], incomeLog = [], 
           })}
         </View>
         {tileStyle === 'grid' ? (
-          <View style={hs.grid}>
-            {order.map((id) => <Tile key={id} id={id} amount={tileAmt(id)} onPress={() => openCat(id)} />)}
-            <Tile id="__other" amount={otherAmt} onPress={() => openCat('__other')} />
-            {customCats.map((c) => <Tile key={c.id} id={c.id} amount={c.amt || 0} meta={c} onPress={() => setDetail({ title: c.zh, items: [] })} />)}
-            <Pressable onPress={() => setShowAdd(true)} style={[hs.tile, hs.addTile]}>
-              <View style={[hs.tileIcon, { backgroundColor: T.surface }]}><Icon name="plus" size={18} sw={2.6} color={T.blue} /></View>
-              <Text style={hs.tileName}>自定义</Text>
-              <Text style={{ fontSize: 11, color: T.faint, marginTop: 4 }}>新增分类</Text>
-            </Pressable>
+          <View style={{ position: 'relative' }} onLayout={(e) => setGridW(e.nativeEvent.layout.width)}>
+            <View style={hs.grid}>
+              {order.map((id) => <Tile key={id} id={id} amount={tileAmt(id)} badge={badges[id]} onPress={() => openCat(id)} onLayout={(L) => { tileLayouts.current[id] = L; }} />)}
+              <Tile id="__other" amount={otherAmt} badge={badges['__other']} onPress={() => openCat('__other')} onLayout={(L) => { tileLayouts.current['__other'] = L; }} />
+              {customCats.map((c) => <Tile key={c.id} id={c.id} amount={c.amt || 0} meta={c} onPress={() => setDetail({ title: c.zh, items: [] })} />)}
+              <Pressable onPress={() => setShowAdd(true)} style={[hs.tile, hs.addTile]}>
+                <View style={[hs.tileIcon, { backgroundColor: T.surface }]}><Icon name="plus" size={18} sw={2.6} color={T.blue} /></View>
+                <Text style={hs.tileName}>自定义</Text>
+                <Text style={{ fontSize: 11, color: T.faint, marginTop: 4 }}>新增分类</Text>
+              </Pressable>
+            </View>
+            {flyers.map((f) => (
+              <FlyCard key={f.id} flyer={f} gridW={gridW} target={tileLayouts.current[f.gcat]} onLand={() => landFly(f)} />
+            ))}
           </View>
         ) : (
           <View>
@@ -278,18 +308,47 @@ export default function HomeScreen({ ledger, transactions = [], incomeLog = [], 
 const CUSTOM_GLYPHS = ['spark', 'dumbbell', 'paw', 'book', 'play', 'cross', 'bag', 'leaf', 'bottle', 'plug', 'chat', 'car'];
 const CUSTOM_SWATCHES = ['#0A84FF', '#34C759', '#FF9500', '#FF2D55', '#5E5CE6', '#FF3B30', '#64D2FF', '#8E8E93'];
 
-function Tile({ id, amount, badge, onPress, meta }) {
+function Tile({ id, amount, badge, onPress, meta, onLayout }) {
   const c = meta || catMeta(id);
+  const disp = useCountUp(amount);
   const zero = amount === 0;
   return (
-    <Pressable onPress={onPress} style={hs.tile}>
+    <Pressable onPress={onPress} onLayout={(e) => onLayout && onLayout(e.nativeEvent.layout)} style={hs.tile}>
       <View style={[hs.tileIcon, { backgroundColor: zero ? T.track : c.color + '1F' }]}>
         <Icon name={c.glyph} size={18} sw={2} color={zero ? T.faint : c.color} />
       </View>
       <Text style={hs.tileName}>{c.zh}</Text>
-      <Text style={[hs.tileAmt, { color: zero ? T.faint : T.ink }]}><Text style={{ fontSize: 11, opacity: 0.7 }}>¥</Text>{amount.toLocaleString('zh-CN')}</Text>
+      <Text style={[hs.tileAmt, { color: zero ? T.faint : T.ink }]} numberOfLines={1}><Text style={{ fontSize: 11, opacity: 0.7 }}>¥</Text>{disp.toLocaleString('zh-CN')}</Text>
       {badge != null && <View style={hs.badge}><Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>+¥{badge}</Text></View>}
     </Pressable>
+  );
+}
+
+// 飞入卡（1:1 还原原型 FlyCard）：从方格区顶部中心飞向目标类目方格中心，缩小淡出后落定
+function FlyCard({ flyer, gridW, target, onLand }) {
+  const a = useRef(new Animated.Value(0)).current;
+  const landed = useRef(false);
+  const W = 124, H = 40;
+  const sx = gridW / 2 - W / 2, sy = -12;
+  const tgt = target || { x: gridW / 2 - 16, y: 64, width: 32, height: 64 };
+  const ex = tgt.x + tgt.width / 2 - W / 2, ey = tgt.y + tgt.height / 2 - H / 2;
+  useEffect(() => {
+    const fire = () => { if (!landed.current) { landed.current = true; onLand(); } };
+    const t = setTimeout(() => Animated.timing(a, { toValue: 1, duration: 660, easing: Easing.bezier(0.5, 0, 0.25, 1), useNativeDriver: true }).start(fire), 40);
+    const fb = setTimeout(fire, 940);
+    return () => { clearTimeout(t); clearTimeout(fb); };
+  }, []);
+  const translateX = a.interpolate({ inputRange: [0, 1], outputRange: [sx, ex] });
+  const translateY = a.interpolate({ inputRange: [0, 1], outputRange: [sy, ey] });
+  const scale = a.interpolate({ inputRange: [0, 1], outputRange: [1, 0.5] });
+  const opacity = a.interpolate({ inputRange: [0, 0.7, 1], outputRange: [1, 1, 0] });
+  const m = catMeta(flyer.cat);
+  return (
+    <Animated.View pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0, width: W, height: H, zIndex: 30, transform: [{ translateX }, { translateY }, { scale }], opacity, flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: T.surface, borderRadius: 12, paddingHorizontal: 10, ...shadow, shadowOpacity: 0.22, shadowRadius: 13 }}>
+      <View style={{ width: 22, height: 22, borderRadius: 6, backgroundColor: m.color, alignItems: 'center', justifyContent: 'center' }}><Icon name={m.glyph} size={13} sw={2} color="#fff" /></View>
+      <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '600', color: T.ink, flex: 1 }}>{flyer.name}</Text>
+      <Text style={{ fontSize: 13, fontWeight: '700', color: T.ink }}>{Math.abs(flyer.amt)}</Text>
+    </Animated.View>
   );
 }
 
