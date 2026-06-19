@@ -72,8 +72,11 @@ export default function HomeScreen({ ledger, transactions = [], incomeLog = [], 
   const dispExp = useCountUp(curP.val);
   const dispInc = useCountUp(todayIncome);
 
-  // 方格按金额降序（真实）
-  const order = [...GRID_CATS].sort((a, b) => (tileAmt(b) - tileAmt(a)) || GRID_CATS.indexOf(a) - GRID_CATS.indexOf(b));
+  // 方格按当前区间消费金额从高到低排序；飞入进行中先冻结位置，落定后再重排（1:1 原型）
+  const sortedOrder = [...GRID_CATS].sort((a, b) => (tileAmt(b) - tileAmt(a)) || (GRID_CATS.indexOf(a) - GRID_CATS.indexOf(b)));
+  const orderRef = useRef(sortedOrder);
+  if (flyers.length === 0) orderRef.current = sortedOrder;
+  const order = orderRef.current;
   const otherAmt = totals['__other'] || 0;
 
   function openCat(id) {
@@ -318,15 +321,42 @@ function Tile({ id, amount, badge, onPress, meta, onLayout }) {
   const c = meta || catMeta(id);
   const disp = useCountUp(amount);
   const zero = amount === 0;
+  // 飞入落定闪动：方格膨胀(tileSwell) + 边框闪光(flash) + 气泡弹入(popIn)
+  const pulse = useRef(new Animated.Value(0)).current;
+  const badgePop = useRef(new Animated.Value(0)).current;
+  const prevBadge = useRef(badge);
+  useEffect(() => {
+    if (badge != null && prevBadge.current == null) {
+      pulse.setValue(0); badgePop.setValue(0);
+      Animated.parallel([
+        Animated.sequence([
+          Animated.timing(pulse, { toValue: 1, duration: 170, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+          Animated.timing(pulse, { toValue: 0, duration: 1150, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+        ]),
+        Animated.spring(badgePop, { toValue: 1, friction: 5, tension: 130, useNativeDriver: true }),
+      ]).start();
+    }
+    prevBadge.current = badge;
+  }, [badge]);
+  const scale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.05] });
+  const flashOp = pulse.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
+  const bScale = badgePop.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] });
   return (
-    <Pressable onPress={onPress} onLayout={(e) => onLayout && onLayout(e.nativeEvent.layout)} style={hs.tile}>
-      <View style={[hs.tileIcon, { backgroundColor: zero ? T.track : c.color + '1F' }]}>
-        <Icon name={c.glyph} size={18} sw={2} color={zero ? T.faint : c.color} />
-      </View>
-      <Text style={hs.tileName}>{c.zh}</Text>
-      <Text style={[hs.tileAmt, { color: zero ? T.faint : T.ink }]} numberOfLines={1}><Text style={{ fontSize: 11, opacity: 0.7 }}>¥</Text>{disp.toLocaleString('zh-CN')}</Text>
-      {badge != null && <View style={hs.badge}><Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>+¥{badge}</Text></View>}
-    </Pressable>
+    <Animated.View onLayout={(e) => onLayout && onLayout(e.nativeEvent.layout)} style={{ width: '31.5%', transform: [{ scale }] }}>
+      <Pressable onPress={onPress} style={[hs.tile, { width: '100%' }]}>
+        <Animated.View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: T.radiusSm, borderWidth: 2, borderColor: T.flash, opacity: flashOp }} />
+        <View style={[hs.tileIcon, { backgroundColor: zero ? T.track : c.color + '1F' }]}>
+          <Icon name={c.glyph} size={18} sw={2} color={zero ? T.faint : c.color} />
+        </View>
+        <Text style={hs.tileName}>{c.zh}</Text>
+        <Text style={[hs.tileAmt, { color: zero ? T.faint : T.ink }]} numberOfLines={1}><Text style={{ fontSize: 11, opacity: 0.7 }}>¥</Text>{disp.toLocaleString('zh-CN')}</Text>
+        {badge != null && (
+          <Animated.View style={[hs.badge, { transform: [{ scale: bScale }] }]}>
+            <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>+¥{badge}</Text>
+          </Animated.View>
+        )}
+      </Pressable>
+    </Animated.View>
   );
 }
 

@@ -266,7 +266,7 @@ export default function App() {
         <RoleSwitchSheet open={showRoleSwitch} onClose={() => setShowRoleSwitch(false)} viewRole={viewRole} onPick={switchView} />
         <PermConfigSheet open={showPerms} onClose={() => setShowPerms(false)} perms={helperPerms} setPerms={setHelperPerms} />
         {incomeReceipt && <IncomeReceipt data={incomeReceipt} onClose={() => setIncomeReceipt(null)} />}
-        <AAScreen open={showAA} transactions={transactions} onAdd={addTx} onDelete={delTx} onClose={() => setShowAA(false)} />
+        <AAScreen open={showAA} onClose={() => setShowAA(false)} />
       </SafeAreaView>
     </SafeAreaProvider>
   );
