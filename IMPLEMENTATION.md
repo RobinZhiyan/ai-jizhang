@@ -44,8 +44,18 @@
 - [ ] M2 持久化 — AsyncStorage (goal/fixed/perms/customcats)
 - [ ] M3 自定义分类(home AddTile) / 分类可视化(treemap/rose/sankey)
 
-## 已提交里程碑
-502ce49 scaffold · 2776fa0 M1骨架 · d1aad4f 装修+账本 · ba0e87f 小目标 · a42f069 固定收支 · (角色权限验证中)
+## ✅ 已在 iOS 模拟器跑通
+`npx expo run:ios` 编译成功，App 装入 iPhone 17 Pro 模拟器运行；首页等界面 **1:1 还原验证通过（截图确认）**。
+- 跑 App：`cd ios && pod install`（首次偶发 xcconfig 未生成需重跑）→ `EXPO_OFFLINE=1 npx expo start` 起 Metro → `xcrun simctl launch booted com.shengji.aijizhang`。
+- 注意：原生构建用 RN 0.74.5 + Xcode 26，可正常编译（无兼容问题）。
+
+## 已提交里程碑（GitHub，全部已推）
+scaffold · M1骨架 · 装修+账本 · 小目标 · 固定收支 · 角色权限 · 持久化 · 数字滚动 · 自定义分类 · 飞入动画 · 原生构建整理
+
+## 剩余可选 polish（原型 Tweaks 级，非默认形态）
+- 收入语音「金币入袋 / 理财亏损」庆祝动画 + 记账闪卡
+- 分类可视化三形态（热力树图 / 消费玫瑰 / 资金流向）—— 原型默认是方格，这些是可切换的呈现选项
+- Web Audio 音效 → expo-av
 
 ## 里程碑
 - **M1（当前冲刺）**：视觉 + 导航 1:1 可跑，核心 4-5 屏，语音用简化交互。

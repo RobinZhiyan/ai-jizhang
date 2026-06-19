@@ -10,8 +10,9 @@ import { GoalConfigPage } from './src/components/GoalCard';
 import { FixedConfigSheet } from './src/components/FixedConfig';
 import { RoleSwitchSheet, PermConfigSheet, HelperBanner, permsFor, PERM_DEFAULT } from './src/components/Roles';
 import { usePersistedState } from './src/usePersisted';
+import { IncomeReceipt } from './src/components/IncomeReceipt';
 import { T, shadow } from './src/theme';
-import { catMeta, LEDGERS, VOICE_SCRIPT, PROJECT_VOICE_SCRIPT, GOAL_DEFAULT, FIXED_DEFAULTS, fixedDailyIncome, yuan, pct, budgetState, stateColor } from './src/data';
+import { catMeta, LEDGERS, VOICE_SCRIPT, PROJECT_VOICE_SCRIPT, INCOME_VOICE_SCRIPT, LOSS_VOICE_SCRIPT, GOAL_DEFAULT, FIXED_DEFAULTS, fixedDailyIncome, goalProgress, goalRemaining, goalMonths, fmtMonths, TODAY_INCOME, MONTHS, CUR_MONTH, MONTH_TOTAL, yuan, pct, budgetState, stateColor } from './src/data';
 import HomeScreen from './src/screens/HomeScreen';
 import ProjectHomeScreen from './src/screens/ProjectHomeScreen';
 import AnalysisScreen from './src/screens/AnalysisScreen';
@@ -151,32 +152,67 @@ export default function App() {
   const [reveal, setReveal] = useState(0);
   const [heard, setHeard] = useState([]);
   const [expenseLog, setExpenseLog] = useState([]);
+  const [incomeLog, setIncomeLog] = useState([]);
+  const [incomeReceipt, setIncomeReceipt] = useState(null);
+  const [activeScript, setActiveScript] = useState(VOICE_SCRIPT);
   const timers = useRef([]);
+  const modeRef = useRef('expense');
+  const scriptRef = useRef(VOICE_SCRIPT);
+  const scenarioRef = useRef(0);
   const ledger = LEDGERS[ledgerId];
   const isProject = ledger.kind === 'project';
-  const script = isProject ? PROJECT_VOICE_SCRIPT : VOICE_SCRIPT;
 
   function clearTimers() { timers.current.forEach(clearTimeout); timers.current = []; }
+  function pickScenario() {
+    if (!permsFor(viewRole, helperPerms).recordIncome) return { mode: 'expense', sc: isProject ? PROJECT_VOICE_SCRIPT : VOICE_SCRIPT };
+    const s = scenarioRef.current % 3; scenarioRef.current += 1;
+    if (s === 1) return { mode: 'income', sc: INCOME_VOICE_SCRIPT };
+    if (s === 2) return { mode: 'loss', sc: LOSS_VOICE_SCRIPT };
+    return { mode: 'expense', sc: isProject ? PROJECT_VOICE_SCRIPT : VOICE_SCRIPT };
+  }
   function onHoldStart() {
     if (tab !== 'home') setTab('home');
+    const pick = pickScenario();
+    modeRef.current = pick.mode; scriptRef.current = pick.sc; setActiveScript(pick.sc);
     clearTimers(); setHeard([]); setReveal(0); setListening(true);
     const DUR = 2600, steps = 40;
     for (let i = 1; i <= steps; i++) timers.current.push(setTimeout(() => setReveal(i / steps), (DUR / steps) * i));
-    script.chunks.forEach((ch) => timers.current.push(setTimeout(() => setHeard((h) => [...h, ch]), DUR * ch.at)));
+    pick.sc.chunks.forEach((ch) => timers.current.push(setTimeout(() => setHeard((h) => [...h, ch]), DUR * ch.at)));
   }
   function onHoldEnd() {
     clearTimers(); setListening(false);
-    const items = script.chunks.map((c) => ({ name: c.name, cat: c.cat, amt: c.amt, who: 'dad' }));
-    if (!isProject) setExpenseLog((l) => [...items, ...l]);
-    setFlyItems({ key: Date.now(), items });
+    const sc = scriptRef.current, mode = modeRef.current;
+    const items = sc.chunks.map((c) => ({ name: c.name, cat: c.cat, amt: c.amt, who: c.who || 'dad' }));
+    if (mode === 'expense') {
+      if (!isProject) setExpenseLog((l) => [...items, ...l]);
+      setFlyItems({ key: Date.now(), items });
+    } else {
+      const total = items.reduce((s, it) => s + it.amt, 0); // 收入>0 / 亏损<0
+      const first = items[0];
+      const item = items.length === 1 ? first : { name: `${items.length} 笔`, cat: first.cat, amt: total, who: first.who };
+      const gainSum = incomeLog.filter((it) => it.amt >= 0).reduce((s, it) => s + it.amt, 0);
+      const lossSum = Math.abs(incomeLog.filter((it) => it.amt < 0).reduce((s, it) => s + it.amt, 0));
+      const incomeBefore = TODAY_INCOME + fixedDailyIncome(fixed) + gainSum;
+      const balanceBefore = MONTHS[CUR_MONTH].income - (MONTH_TOTAL + lossSum) + gainSum;
+      const after = { ...goal, saved: Math.max((Number(goal.saved) || 0) + total, 0) };
+      const gd = goal && goal.enabled && Number(goal.target) > 0 ? {
+        hasGoal: true, name: goal.name, glyph: goal.glyph, color: goal.color || '#0A84FF',
+        pctBefore: goalProgress(goal) * 100, pctAfter: goalProgress(after) * 100,
+        remBefore: goalRemaining(goal), remAfter: goalRemaining(after),
+        etaBefore: fmtMonths(goalMonths(goal)), etaAfter: fmtMonths(goalMonths(after)),
+      } : { hasGoal: false };
+      setIncomeLog((l) => [...items, ...l]);
+      setGoal((g) => (g && g.enabled ? { ...g, saved: Math.max((Number(g.saved) || 0) + total, 0) } : g));
+      setIncomeReceipt({ kind: mode === 'loss' ? 'loss' : 'gain', item, incomeBefore, incomeAfter: incomeBefore + total, balanceBefore, balanceAfter: balanceBefore + total, goal: gd });
+    }
     setReveal(0); setHeard([]);
   }
   function switchLedger(id) { setLedgerId(id); setTab('home'); setShowLedger(false); }
   const perms = permsFor(viewRole, helperPerms);
   function switchView(role) { setViewRole(role); setShowRoleSwitch(false); if (role === 'helper' && (tab === 'analysis' || tab === 'budget' || tab === 'profile')) setTab('home'); }
 
-  const transcript = script.full.slice(0, Math.round(reveal * script.full.length));
-  const homeProps = { ledger, onOpenLedger: () => setShowLedger(true), onOpenAgent: () => { onHoldStart(); setTimeout(onHoldEnd, 3000); }, onOpenBudget: () => setTab('budget'), goal, onOpenGoal: () => setShowGoal(true), fixedDailyIncome: fixedDailyIncome(fixed), perms, viewRole, onOpenRoleSwitch: () => setShowRoleSwitch(true), onExitHelper: () => switchView('admin') };
+  const transcript = activeScript.full.slice(0, Math.round(reveal * activeScript.full.length));
+  const homeProps = { ledger, onOpenLedger: () => setShowLedger(true), onOpenAgent: () => { onHoldStart(); setTimeout(onHoldEnd, 3000); }, onOpenBudget: () => setTab('budget'), goal, onOpenGoal: () => setShowGoal(true), fixedDailyIncome: fixedDailyIncome(fixed), perms, viewRole, onOpenRoleSwitch: () => setShowRoleSwitch(true), onExitHelper: () => switchView('admin'), incomeLog };
 
   let screen;
   if (tab === 'home') screen = isProject ? <ProjectHomeScreen {...homeProps} /> : <HomeScreen {...homeProps} expenseLog={expenseLog} />;
@@ -200,6 +236,7 @@ export default function App() {
         <FixedConfigSheet open={showFixed} onClose={() => setShowFixed(false)} config={fixed} setConfig={setFixed} />
         <RoleSwitchSheet open={showRoleSwitch} onClose={() => setShowRoleSwitch(false)} viewRole={viewRole} onPick={switchView} />
         <PermConfigSheet open={showPerms} onClose={() => setShowPerms(false)} perms={helperPerms} setPerms={setHelperPerms} />
+        {incomeReceipt && <IncomeReceipt data={incomeReceipt} onClose={() => setIncomeReceipt(null)} />}
       </SafeAreaView>
     </SafeAreaProvider>
   );

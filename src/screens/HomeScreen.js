@@ -12,7 +12,7 @@ import {
   catMeta, catOrders, yuan,
 } from '../data';
 
-export default function HomeScreen({ ledger, expenseLog = [], onOpenAgent, goal, onOpenGoal, fixedDailyIncome = 0, perms = {}, viewRole, onOpenRoleSwitch, onExitHelper }) {
+export default function HomeScreen({ ledger, expenseLog = [], incomeLog = [], onOpenAgent, goal, onOpenGoal, fixedDailyIncome = 0, perms = {}, viewRole, onOpenRoleSwitch, onExitHelper }) {
   const [range, setRange] = useState('today');
   const [heroPeriod, setHeroPeriod] = useState('today');
   const [periodOpen, setPeriodOpen] = useState(false);
@@ -38,8 +38,10 @@ export default function HomeScreen({ ledger, expenseLog = [], onOpenAgent, goal,
     { k: 'last', short: '上月', label: '上月支出', val: MONTHS[CUR_MONTH - 1].expense, items: LASTMONTH_EXP_CATS, variant: 'cat' },
   ];
   const curP = HERO.find((p) => p.k === heroPeriod) || HERO[0];
-  const todayIncome = TODAY_INCOME + fixedDailyIncome;
-  const monthBalance = MONTHS[CUR_MONTH].income - (MONTH_TOTAL + sumBumps);
+  const gainSum = incomeLog.filter((it) => it.amt >= 0).reduce((s, it) => s + it.amt, 0);
+  const lossSum = Math.abs(incomeLog.filter((it) => it.amt < 0).reduce((s, it) => s + it.amt, 0));
+  const todayIncome = TODAY_INCOME + fixedDailyIncome + gainSum;
+  const monthBalance = MONTHS[CUR_MONTH].income - (MONTH_TOTAL + sumBumps + lossSum) + gainSum;
   const dispExp = useCountUp(curP.val);
   const dispInc = useCountUp(todayIncome);
 
