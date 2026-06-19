@@ -1,7 +1,7 @@
 // App.js — 根：5-Tab 导航（总览/分析/记账长按语音/预算/我的）+ 多账本 + 语音状态机
 // 1:1 移植自原型 app.jsx（去掉 iOS 设备外壳，RN 直接全屏）
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Animated, Easing, Vibration } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import Icon from './src/components/Icon';
@@ -19,6 +19,20 @@ import ProjectHomeScreen from './src/screens/ProjectHomeScreen';
 import AnalysisScreen from './src/screens/AnalysisScreen';
 import BudgetScreen from './src/screens/BudgetScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
+
+// 触觉反馈：优先 expo-haptics(真机重编译后细腻)，否则降级 RN 内置 Vibration
+let Haptics = null;
+try { Haptics = require('expo-haptics'); } catch (e) {}
+function buzz(kind) {
+  try {
+    if (Haptics && Haptics.impactAsync) {
+      if (kind === 'success') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      else Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      return;
+    }
+  } catch (e) {}
+  try { Vibration.vibrate(8); } catch (x) {}
+}
 
 const TABS = [
   { id: 'home', label: '总览', icon: 'house' },
@@ -182,7 +196,7 @@ export default function App() {
     pick.sc.chunks.forEach((ch) => timers.current.push(setTimeout(() => setHeard((h) => [...h, ch]), DUR * ch.at)));
   }
   function onHoldEnd() {
-    clearTimers(); setListening(false);
+    clearTimers(); setListening(false); buzz();
     const sc = scriptRef.current, mode = modeRef.current;
     const items = sc.chunks.map((c) => ({ name: c.name, cat: c.cat, amt: c.amt, who: c.who || 'dad' }));
     if (mode === 'expense') {
@@ -232,7 +246,7 @@ export default function App() {
           {viewRole === 'helper' && <HelperBanner onExit={() => switchView('admin')} />}
           <HoldOverlay open={listening} transcript={transcript} heard={heard} />
           {flyItems && <FlyLayer key={flyItems.key} items={flyItems.items} onDone={() => setFlyItems(null)} />}
-          {coinFly && <CoinFly key={coinFly.key} kind={coinFly.kind} onLand={() => setIncomeReceipt(coinFly.data)} onDone={() => setCoinFly(null)} />}
+          {coinFly && <CoinFly key={coinFly.key} kind={coinFly.kind} onLand={() => { buzz('success'); setIncomeReceipt(coinFly.data); }} onDone={() => setCoinFly(null)} />}
         </View>
         <TabBar tab={tab} setTab={setTab} listening={listening} onHoldStart={onHoldStart} onHoldEnd={onHoldEnd} perms={perms} />
         <LedgerSheet open={showLedger} onClose={() => setShowLedger(false)} current={ledgerId} onPick={switchLedger} />
