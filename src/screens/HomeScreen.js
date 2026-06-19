@@ -5,6 +5,7 @@ import Icon from '../components/Icon';
 import { Card, CatIcon, Avatar, Money, Bar, RangeTabs, Sheet, useCountUp } from '../components/ui';
 import { GoalCard } from '../components/GoalCard';
 import { usePersistedState } from '../usePersisted';
+import { CatTreemap, CatRose, CatSankey } from '../components/CatViz';
 import { T, shadow } from '../theme';
 import {
   MEMBERS, GRID_CATS, RANGE_SPEND, RANGE_TOTAL, RANGE_LABEL, MONTH_TOTAL, MONTHS, CUR_MONTH,
@@ -18,6 +19,7 @@ export default function HomeScreen({ ledger, expenseLog = [], incomeLog = [], on
   const [periodOpen, setPeriodOpen] = useState(false);
   const [showFeed, setShowFeed] = useState(false);
   const [detail, setDetail] = useState(null);
+  const [tileStyle, setTileStyle] = usePersistedState('vb_tilestyle', 'grid');
   const [customCats, setCustomCats] = usePersistedState('vb_customcats', []);
   const [showAdd, setShowAdd] = useState(false);
   const [draft, setDraft] = useState({ name: '', color: '#0A84FF', glyph: 'spark' });
@@ -56,6 +58,12 @@ export default function HomeScreen({ ledger, expenseLog = [], incomeLog = [], on
     const list = b > 0 ? [...items, { name: '语音记账', cat: id, amt: b, who: 'dad' }] : items;
     setDetail({ title: `${catMeta(id).zh} · ${RANGE_LABEL[range]}`, items: list });
   }
+
+  const catList = [
+    ...order.map((id) => ({ id, amount: tileAmt(id), meta: catMeta(id) })),
+    { id: '__other', amount: otherAmt, meta: catMeta('__other') },
+    ...customCats.map((c) => ({ id: c.id, amount: c.amt || 0, meta: c })),
+  ];
 
   return (
     <View style={{ flex: 1, backgroundColor: T.bg }}>
@@ -136,18 +144,40 @@ export default function HomeScreen({ ledger, expenseLog = [], incomeLog = [], on
         {/* 分类支出 */}
         <View style={hs.secHead}>
           <Text style={hs.secTitle}>分类支出</Text>
-          <View style={{ flex: 1, maxWidth: 296, marginLeft: 10 }}><RangeTabs value={range} onChange={setRange} /></View>
+          <View style={{ flex: 1, maxWidth: 224, marginLeft: 10 }}><RangeTabs value={range} onChange={setRange} /></View>
         </View>
-        <View style={hs.grid}>
-          {order.map((id) => <Tile key={id} id={id} amount={tileAmt(id)} badge={bumps[id]} onPress={() => openCat(id)} />)}
-          <Tile id="__other" amount={otherAmt} onPress={() => openCat('__other')} />
-          {customCats.map((c) => <Tile key={c.id} id={c.id} amount={c.amt || 0} meta={c} onPress={() => setDetail({ title: c.zh, items: [] })} />)}
-          <Pressable onPress={() => setShowAdd(true)} style={[hs.tile, hs.addTile]}>
-            <View style={[hs.tileIcon, { backgroundColor: T.surface }]}><Icon name="plus" size={18} sw={2.6} color={T.blue} /></View>
-            <Text style={hs.tileName}>自定义</Text>
-            <Text style={{ fontSize: 11, color: T.faint, marginTop: 4 }}>新增分类</Text>
-          </Pressable>
+        {/* 呈现形式切换：方格 / 树图 / 玫瑰 / 桑基 */}
+        <View style={{ flexDirection: 'row', gap: 6, marginBottom: 11 }}>
+          {[{ k: 'grid', i: 'box' }, { k: 'treemap', i: 'pie' }, { k: 'rose', i: 'spark' }, { k: 'sankey', i: 'trend' }].map((o) => {
+            const on = tileStyle === o.k;
+            return (
+              <Pressable key={o.k} onPress={() => setTileStyle(o.k)} style={{ width: 40, height: 30, borderRadius: 9, backgroundColor: on ? T.ink : T.surface2, alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name={o.i} size={17} sw={2} color={on ? '#fff' : T.muted} />
+              </Pressable>
+            );
+          })}
         </View>
+        {tileStyle === 'grid' ? (
+          <View style={hs.grid}>
+            {order.map((id) => <Tile key={id} id={id} amount={tileAmt(id)} badge={bumps[id]} onPress={() => openCat(id)} />)}
+            <Tile id="__other" amount={otherAmt} onPress={() => openCat('__other')} />
+            {customCats.map((c) => <Tile key={c.id} id={c.id} amount={c.amt || 0} meta={c} onPress={() => setDetail({ title: c.zh, items: [] })} />)}
+            <Pressable onPress={() => setShowAdd(true)} style={[hs.tile, hs.addTile]}>
+              <View style={[hs.tileIcon, { backgroundColor: T.surface }]}><Icon name="plus" size={18} sw={2.6} color={T.blue} /></View>
+              <Text style={hs.tileName}>自定义</Text>
+              <Text style={{ fontSize: 11, color: T.faint, marginTop: 4 }}>新增分类</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <View>
+            {tileStyle === 'treemap' && <CatTreemap cats={catList} onOpen={(id) => openCat(id)} />}
+            {tileStyle === 'rose' && <CatRose cats={catList} onOpen={(id) => openCat(id)} />}
+            {tileStyle === 'sankey' && <CatSankey cats={catList} onOpen={(id) => openCat(id)} />}
+            <Pressable onPress={() => setShowAdd(true)} style={{ marginTop: 10, borderWidth: 1.5, borderStyle: 'dashed', borderColor: T.hair, borderRadius: T.radiusSm, paddingVertical: 13, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
+              <Icon name="plus" size={17} sw={2.4} color={T.blue} /><Text style={{ color: T.blue, fontSize: 14, fontWeight: '600' }}>自定义分类</Text>
+            </Pressable>
+          </View>
+        )}
 
         {/* 明细入口 */}
         <Pressable onPress={() => setShowFeed(true)} style={hs.feedBtn}>
