@@ -11,6 +11,7 @@ import { FixedConfigSheet } from './src/components/FixedConfig';
 import { RoleSwitchSheet, PermConfigSheet, HelperBanner, permsFor, PERM_DEFAULT } from './src/components/Roles';
 import { usePersistedState } from './src/usePersisted';
 import { IncomeReceipt } from './src/components/IncomeReceipt';
+import { CoinFly } from './src/components/CoinFly';
 import { T, shadow } from './src/theme';
 import { catMeta, LEDGERS, VOICE_SCRIPT, PROJECT_VOICE_SCRIPT, INCOME_VOICE_SCRIPT, LOSS_VOICE_SCRIPT, GOAL_DEFAULT, FIXED_DEFAULTS, fixedDailyIncome, goalProgress, goalRemaining, goalMonths, fmtMonths, TODAY_INCOME, MONTHS, CUR_MONTH, MONTH_TOTAL, yuan, pct, budgetState, stateColor } from './src/data';
 import HomeScreen from './src/screens/HomeScreen';
@@ -154,6 +155,7 @@ export default function App() {
   const [expenseLog, setExpenseLog] = useState([]);
   const [incomeLog, setIncomeLog] = useState([]);
   const [incomeReceipt, setIncomeReceipt] = useState(null);
+  const [coinFly, setCoinFly] = useState(null);
   const [activeScript, setActiveScript] = useState(VOICE_SCRIPT);
   const timers = useRef([]);
   const modeRef = useRef('expense');
@@ -203,7 +205,8 @@ export default function App() {
       } : { hasGoal: false };
       setIncomeLog((l) => [...items, ...l]);
       setGoal((g) => (g && g.enabled ? { ...g, saved: Math.max((Number(g.saved) || 0) + total, 0) } : g));
-      setIncomeReceipt({ kind: mode === 'loss' ? 'loss' : 'gain', item, incomeBefore, incomeAfter: incomeBefore + total, balanceBefore, balanceAfter: balanceBefore + total, goal: gd });
+      const receiptData = { kind: mode === 'loss' ? 'loss' : 'gain', item, incomeBefore, incomeAfter: incomeBefore + total, balanceBefore, balanceAfter: balanceBefore + total, goal: gd };
+      setCoinFly({ key: Date.now(), kind: mode === 'loss' ? 'loss' : 'gain', data: receiptData });
     }
     setReveal(0); setHeard([]);
   }
@@ -229,6 +232,7 @@ export default function App() {
           {viewRole === 'helper' && <HelperBanner onExit={() => switchView('admin')} />}
           <HoldOverlay open={listening} transcript={transcript} heard={heard} />
           {flyItems && <FlyLayer key={flyItems.key} items={flyItems.items} onDone={() => setFlyItems(null)} />}
+          {coinFly && <CoinFly key={coinFly.key} kind={coinFly.kind} onLand={() => setIncomeReceipt(coinFly.data)} onDone={() => setCoinFly(null)} />}
         </View>
         <TabBar tab={tab} setTab={setTab} listening={listening} onHoldStart={onHoldStart} onHoldEnd={onHoldEnd} perms={perms} />
         <LedgerSheet open={showLedger} onClose={() => setShowLedger(false)} current={ledgerId} onPick={switchLedger} />
