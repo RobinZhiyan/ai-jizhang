@@ -33,7 +33,7 @@ export function RoleSwitchSheet({ open, onClose, viewRole, onPick }) {
     { id: 'helper', m: HELPER, name: '保姆 · 阿姨', sub: '仅记账与查看今日支出' },
   ];
   return (
-    <Sheet open={open} onClose={onClose} title="切换视角">
+    <Sheet open={open} onClose={onClose} title="切换使用账号">
       <View style={{ gap: 10 }}>
         {rows.map((r) => {
           const on = r.id === viewRole;
@@ -44,13 +44,13 @@ export function RoleSwitchSheet({ open, onClose, viewRole, onPick }) {
                 <Text style={{ fontSize: 16, fontWeight: '600', color: T.ink }}>{r.name}</Text>
                 <Text style={{ fontSize: 12.5, color: T.muted, marginTop: 2 }}>{r.sub}</Text>
               </View>
-              {on ? <Icon name="check" size={22} sw={2.6} color={T.ok} /> : <Text style={{ fontSize: 12.5, fontWeight: '600', color: T.blue }}>预览</Text>}
+              {on ? <Text style={{ fontSize: 12.5, fontWeight: '600', color: T.ok }}>当前</Text> : <Text style={{ fontSize: 12.5, fontWeight: '600', color: T.blue }}>进入</Text>}
             </Pressable>
           );
         })}
       </View>
       <View style={{ marginTop: 14, paddingVertical: 12, paddingHorizontal: 14, backgroundColor: T.surface2, borderRadius: 14 }}>
-        <Text style={{ fontSize: 12.5, color: T.muted, lineHeight: 20 }}>切到保姆视角可预览阿姨能看到的界面。她看不到家庭收入、结余、小目标等核心数据，只能记一笔支出。可在「我的 → 成员权限」里调整她的可见范围。</Text>
+        <Text style={{ fontSize: 12.5, color: T.muted, lineHeight: 20 }}>切换到阿姨账号后，界面只保留她可用的部分：记一笔支出、查看今日支出。家庭收入、结余、小目标等核心数据按你在「我的 → 成员权限」的设置隐藏，保存后即时生效。</Text>
       </View>
     </Sheet>
   );
@@ -62,10 +62,10 @@ export function HelperBanner({ onExit }) {
     <Pressable onPress={onExit} style={hb.banner}>
       <Avatar m={HELPER} size={24} />
       <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'baseline' }}>
-        <Text style={{ fontSize: 13.5, fontWeight: '700', color: '#fff' }}>保姆视角 · 预览中</Text>
-        <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.9)', marginLeft: 8 }}>仅可记账与查看支出</Text>
+        <Text style={{ fontSize: 13.5, fontWeight: '700', color: '#fff' }}>当前 · 保姆 阿姨</Text>
+        <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.9)', marginLeft: 8 }}>仅可记一笔支出</Text>
       </View>
-      <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#fff' }}>退出 ›</Text>
+      <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#fff' }}>切回管理员 ›</Text>
     </Pressable>
   );
 }
@@ -109,7 +109,7 @@ export function PermConfigSheet({ open, onClose, perms, setPerms }) {
           </View>
         ))}
       </View>
-      <Text style={{ marginTop: 14, fontSize: 12, color: T.faint, lineHeight: 19, paddingHorizontal: 2 }}>关闭的项目，阿姨在她的界面里完全看不到。打开后她也能查看对应数据。改完点右上角「视角」切到保姆预览看看效果。</Text>
+      <Text style={{ marginTop: 14, fontSize: 12, color: T.faint, lineHeight: 19, paddingHorizontal: 2 }}>关闭的项目，阿姨在她账号里完全看不到；打开后她也能查看对应数据。保存后阿姨端立即生效，可点右上角头像切到阿姨账号确认。</Text>
     </Sheet>
   );
 }

@@ -261,7 +261,7 @@ export default function App() {
   function commitText(text) {
     const parsed = parseSpeech(text);
     if (!parsed.length) return false;
-    const mode = isProject ? 'expense' : detectMode(text);
+    const mode = (isProject || viewRole === 'helper') ? 'expense' : detectMode(text); // 保姆账号只记支出
     const items = parsed.map((it) => ({ name: it.name, cat: it.cat, amt: mode === 'loss' ? -Math.abs(it.amt) : it.amt, who: 'dad' }));
     processVoiceItems(items, mode);
     return true;
@@ -329,7 +329,10 @@ export default function App() {
           </View>
           <Text style={{ fontSize: 12.5, fontWeight: '600', color: T.muted, marginTop: 18, marginBottom: 10 }}>快捷测试样本（点一下即记账）</Text>
           <View style={{ gap: 8 }}>
-            {['打车30 外卖20 奶茶15', '超市买菜88 水果46', '工资到账5000', '股票亏损1500'].map((s) => (
+            {(viewRole === 'helper'
+              ? ['打车30 外卖20 奶茶15', '超市买菜88 水果46', '打车12 停车10 矿泉水6']
+              : ['打车30 外卖20 奶茶15', '超市买菜88 水果46', '工资到账5000', '股票亏损1500']
+            ).map((s) => (
               <Pressable key={s} onPress={() => { commitText(s); setShowMock(false); }}
                 style={{ backgroundColor: T.surface, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, flexDirection: 'row', alignItems: 'center', gap: 10, ...shadow }}>
                 <Icon name="mic" size={17} sw={2} color={T.blue} />
